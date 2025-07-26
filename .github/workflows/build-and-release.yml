@@ -39,10 +39,7 @@ jobs:
     - name: Install Power Platform CLI
       run: |
         dotnet tool install --global Microsoft.PowerApps.CLI.Tool
-        
-    - name: Verify PAC CLI installation
-      run: pac --version
-      
+              
     - name: Create solution folder
       run: |
         mkdir solution
