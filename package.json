@@ -8,13 +8,13 @@
 		"rebuild":  "pcf-scripts rebuild",
 		"start":  "pcf-scripts start",
 		"refreshTypes":  "pcf-scripts refreshTypes",
-		"boom":  "pwsh -ExecutionPolicy Bypass -File BuildDataversePCFSolution/build-solution.ps1 -BuildConfiguration Release",
-		"boom-debug":  "pwsh -ExecutionPolicy Bypass -File BuildDataversePCFSolution/build-solution.ps1 -BuildConfiguration Debug",
-		"boom-check":  "pwsh -ExecutionPolicy Bypass -File BuildDataversePCFSolution/environment-check.ps1",
-		"boom-managed":  "pwsh -ExecutionPolicy Bypass -File BuildDataversePCFSolution/build-solution.ps1 -BuildConfiguration Release -PackageType Managed",
-		"boom-unmanaged":  "pwsh -ExecutionPolicy Bypass -File BuildDataversePCFSolution/build-solution.ps1 -BuildConfiguration Release -PackageType Unmanaged",
-		"boom-create":  "pwsh -ExecutionPolicy Bypass -File BuildDataversePCFSolution/create-pcf-project.ps1",
-		"boom-upgrade":  "pwsh -ExecutionPolicy Bypass -File BuildDataversePCFSolution/upgrade-builddataverse.ps1"
+		"boom":  "powershell.exe -ExecutionPolicy Bypass -Command \"\u0026 \u0027./BuildDataversePCFSolution/build-solution.ps1\u0027 -BuildConfiguration Release\"",
+		"boom-upgrade":  "powershell.exe -ExecutionPolicy Bypass -Command \"\u0026 \u0027./BuildDataversePCFSolution/upgrade.ps1\u0027\"",
+		"boom-debug":  "powershell.exe -ExecutionPolicy Bypass -Command \"\u0026 \u0027./BuildDataversePCFSolution/build-solution.ps1\u0027 -BuildConfiguration Debug\"",
+		"boom-check":  "powershell.exe -ExecutionPolicy Bypass -Command \"\u0026 \u0027./BuildDataversePCFSolution/environment-check.ps1\u0027\"",
+		"boom-managed":  "powershell.exe -ExecutionPolicy Bypass -Command \"\u0026 \u0027./BuildDataversePCFSolution/build-solution.ps1\u0027 -BuildConfiguration Release -PackageType Managed\"",
+		"boom-unmanaged":  "powershell.exe -ExecutionPolicy Bypass -Command \"\u0026 \u0027./BuildDataversePCFSolution/build-solution.ps1\u0027 -BuildConfiguration Release -PackageType Unmanaged\"",
+		"boom-create":  "powershell.exe -ExecutionPolicy Bypass -Command \"\u0026 \u0027./BuildDataversePCFSolution/create-pcf-project.ps1\u0027\""
 	},
 	"devDependencies":  {
 		"@babel/core":  "^7.23.6",
