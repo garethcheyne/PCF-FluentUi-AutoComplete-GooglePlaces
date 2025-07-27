@@ -1,4 +1,4 @@
-name: Build and Release PCF Control
+﻿name: Build and Release PCF Control
 
 on:
   push:
@@ -25,45 +25,17 @@ jobs:
         node-version: '18'
         cache: 'npm'
         
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Build PCF control
-      run: npm run build
-      
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '6.0.x'
         
     - name: Install Power Platform CLI
-      run: |
-        dotnet tool install --global Microsoft.PowerApps.CLI.Tool
-              
-    - name: Create solution folder
-      run: |
-        mkdir solution
-        cd solution
+      run: dotnet tool install --global Microsoft.PowerApps.CLI.Tool
         
-    - name: Initialize solution
-      run: |
-        cd solution
-        pac solution init --publisher-name "Gareth Cheyne" --publisher-prefix "gc" --solution-name "${{ env.SOLUTION_NAME }}"
-        
-    - name: Add PCF control to solution
-      run: |
-        cd solution
-        pac solution add-reference --path ../
-        
-    - name: Build solution
-      run: |
-        cd solution
-        dotnet build
-        
-    - name: Pack solution
-      run: |
-        cd solution
-        pac solution pack --zipfile "../${{ env.SOLUTION_NAME }}.zip" --folder "${{ env.SOLUTION_NAME }}"
+    - name: Run build script
+      run: .\BuildDataverseSolution\build-solution.ps1 -BuildConfiguration "Release" -CiMode "GitHub"
+      shell: pwsh
         
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -106,24 +78,24 @@ jobs:
         body: |
           ## PCF FluentUI AutoComplete - Google Places ${{ github.ref }}
           
-          ### 🚀 What's New
+          ### ðŸš€ What's New
           - Enhanced Google Places API integration
           - Interactive hover cards with Google Maps
           - Country restriction toggle functionality
           - Improved accessibility and performance
           
-          ### 💾 Installation
+          ### ðŸ’¾ Installation
           1. Download the `${{ env.SOLUTION_NAME }}.zip` file
           2. Import it into your Power Platform environment
           3. Configure your Google Places API key
           4. Add the control to your forms or canvas apps
           
-          ### 📋 Requirements
+          ### ðŸ“‹ Requirements
           - Power Platform environment with PCF controls enabled
           - Google Places API key
           - Places API and Maps JavaScript API enabled
           
-          ### 🔧 Configuration
+          ### ðŸ”§ Configuration
           See the [README](https://github.com/garethcheyne/PCF-FluentUi-AutoComplete-GooglePlaces/blob/main/README.md) for detailed configuration instructions.
           
           ---
@@ -164,3 +136,4 @@ jobs:
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
+

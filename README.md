@@ -85,6 +85,91 @@ A powerful PowerApps Component Framework (PCF) control that provides Google Plac
 3. Add the PCF control to your solution
 4. Publish the solution
 
+## 🚀 BuildDataversePCFSolution - Enhanced Build Commands
+
+This project includes **BuildDataversePCFSolution**, a comprehensive build and deployment system that extends the standard PCF development experience with automated solution packaging, environment management, and CI/CD integration.
+
+### 🛠️ Available Boom Commands
+
+All BuildDataversePCFSolution commands are prefixed with `boom-` to distinguish them from standard PCF scripts:
+
+#### **Environment Management**
+```bash
+# Check development environment and validate all required tools
+npm run boom-check
+```
+Validates Node.js, .NET SDK, Power Platform CLI, and Git installations. Provides installation guidance for missing dependencies.
+
+#### **Build Commands**
+```bash
+# Quick Release build (creates both managed and unmanaged solutions)
+npm run boom
+
+# Quick Debug build for development and testing
+npm run boom-debug
+
+# Build managed solution only (for production deployment)
+npm run boom-managed
+
+# Build unmanaged solution only (for development environments)
+npm run boom-unmanaged
+```
+
+#### **Project Management**
+```bash
+# Create new PCF projects with BuildDataversePCFSolution integration
+npm run boom-create
+```
+Interactive project creator with template selection and automatic BuildDataversePCFSolution setup.
+
+### 📦 Automated Solution Packaging
+
+All build commands automatically:
+- ✅ Create versioned solution packages in the `releases/` directory
+- ✅ Generate both managed and unmanaged solutions (unless specified otherwise)
+- ✅ Include proper versioning based on `package.json`
+- ✅ Validate project structure and dependencies
+- ✅ Create deployment-ready ZIP files
+
+### 📁 Output Structure
+```
+releases/
+├── PCFFluentUiAutoCompleteGooglePlaces_v2025.7.27.01_managed.zip
+└── PCFFluentUiAutoCompleteGooglePlaces_v2025.7.27.01_unmanaged.zip
+```
+
+### 🔄 CI/CD Integration
+
+BuildDataversePCFSolution includes GitHub Actions workflows for:
+- Automated builds on push/PR
+- Release creation with solution packages
+- Environment validation and testing
+- Multi-environment deployment support
+
+To set up CI/CD, commit your changes and push to GitHub:
+```bash
+git add .
+git commit -m "Add BuildDataversePCFSolution"
+git push origin main
+
+# Create a release
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+### 📋 Quick Reference
+
+| Command | Purpose | Output Location |
+|---------|---------|-----------------|
+| `npm run boom-check` | Validate development environment | Console output |
+| `npm run boom` | Release build (both managed & unmanaged) | `releases/` directory |
+| `npm run boom-debug` | Debug build for development | `releases/` directory |
+| `npm run boom-managed` | Managed solution only | `releases/` directory |
+| `npm run boom-unmanaged` | Unmanaged solution only | `releases/` directory |
+| `npm run boom-create` | Create new PCF project | Interactive wizard |
+
+> 💡 **Tip**: Always run `npm run boom-check` first to ensure your development environment is properly configured before building solutions.
+
 ## ⚙️ Configuration
 
 ### Required Properties

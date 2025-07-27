@@ -1,0 +1,94 @@
+﻿# PCF Solution Build Configuration
+# This file defines the configuration for building and packaging PCF controls into Power Platform solutions
+
+# Solution Information
+solution:
+  name: "PCFFluentUiAutoCompleteGooglePlaces"
+  displayName: "PCF FluentUI Google Address AutoComplete"
+  description: "A Google Places autocomplete control using React and FluentUI. Provides address search functionality with Google Places API integration."
+  version: "2025.7.27.2"
+
+# Publisher Information
+publisher:
+  name: "garethcheyne"
+  displayName: "Gareth Cheyne"
+  prefix: "gc"
+  description: "Custom PCF controls and Power Platform solutions"
+
+# Build Configuration
+build:
+  # Node.js version to use
+  nodeVersion: "18"
+  
+  # .NET version for Power Platform CLI
+  dotnetVersion: "6.0.x"
+  
+  # Build configuration (Release or Debug)
+  configuration: "Release"
+  
+  # Whether to run npm ci (clean install) vs npm install
+  cleanInstall: true
+  
+  # Output directory for build artifacts
+  outputDirectory: "out"
+
+# Package Configuration
+package:
+  # Whether to create a managed solution package
+  createManaged: true
+  
+  # Whether to create an unmanaged solution package
+  createUnmanaged: true
+  
+  # Package naming convention
+  namingConvention: "{solution.name}_{version}"
+# GitHub-specific configuration
+github:
+  # Repository information
+  owner: "garethcheyne"
+  repository: "PCF-FluentUi-AutoComplete-GooglePlaces"
+  
+  # Release configuration
+  releases:
+    # Whether to create GitHub releases automatically
+    createReleases: true
+    
+    # Release naming pattern
+    namePattern: "v{version}"
+    
+    # Whether to mark releases as pre-release
+    preRelease: false
+    
+    # Release notes configuration
+    generateReleaseNotes: true
+# Environment Variables (can be overridden)
+environment:
+  SOLUTION_NAME: "PCFFluentUiAutoCompleteGooglePlaces"
+  PUBLISHER_NAME: "garethcheyne"
+  PUBLISHER_PREFIX: "gc"
+  BUILD_CONFIGURATION: "Release"
+
+# Custom Scripts (optional)
+scripts:
+  # Pre-build script (PowerShell)
+  preBuild: "Write-Host 'Starting pre-build validation for PCF FluentUI Google Address AutoComplete...'"
+  
+  # Post-build script (PowerShell)
+  postBuild: "Write-Host 'Running post-build validation...'"
+  
+  # Pre-package script (PowerShell)
+  prePackage: "Write-Host 'Preparing PCF FluentUI Google Address AutoComplete package...'"
+  
+  # Post-package script (PowerShell)
+  postPackage: "Write-Host 'PCF FluentUI Google Address AutoComplete package created successfully!'"
+
+# Logging Configuration
+logging:
+  # Log level (Verbose, Info, Warning, Error)
+  level: "Info"
+  
+  # Whether to show timestamps
+  showTimestamps: true
+  
+  # Whether to use colors in output
+  useColors: true
