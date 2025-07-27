@@ -34,7 +34,7 @@ jobs:
       run: dotnet tool install --global Microsoft.PowerApps.CLI.Tool
         
     - name: Run build script
-      run: .\BuildDataverseSolution\build-solution.ps1 -BuildConfiguration "Release" -CiMode "GitHub"
+      run: .\BuildDataversePCFSolution\build-solution.ps1 -BuildConfiguration "Release" -CiMode "GitHub"
       shell: pwsh
         
     - name: Upload build artifacts

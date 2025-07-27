@@ -113,6 +113,3 @@ pnpm-lock.yaml
 # Database
 *.db
 *.sqlite
-
-# BuildDataverseSolution Tools
-BuildDataverseSolution/
