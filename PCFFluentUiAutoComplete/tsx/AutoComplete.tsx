@@ -1,16 +1,21 @@
 import * as React from 'react'
 import { useDebounce } from 'usehooks-ts'
 import { IInputs } from '../generated/ManifestTypes'
-import { GooglePlacesAutocompleteResponse, PlacePrediction, AddressItem, GooglePlacesUtils, ParsedAddress } from '../types'
+import { PlacePrediction, AddressItem, GooglePlacesUtils, ParsedAddress } from '../types'
 import { fetchAddressSuggestions, fetchPlaceDetails } from './Queries'
 import { EntityHoverCard } from './EntityHoverCard'
 import { useState, useRef, useEffect, ChangeEvent } from 'react'
 import { FocusZone, FocusZoneDirection } from '@fluentui/react/lib/FocusZone'
-import { TooltipHost, ITooltipHostStyles } from '@fluentui/react/lib/Tooltip'
+import { ITooltipHostStyles, } from '@fluentui/react/lib/Tooltip'
 import { IIconProps } from '@fluentui/react/lib/Icon'
 import { mergeStyleSets, getTheme, getFocusStyle, ITheme } from '@fluentui/react/lib/Styling'
 import { ActionButton } from '@fluentui/react/lib/Button'
-import { ThemeProvider, SearchBox, Stack, IStackTokens, Icon, FontWeights, DirectionalHint, TooltipDelay, Label, Toggle } from '@fluentui/react'
+import { ThemeProvider } from '@fluentui/react/lib/Theme'
+import { SearchBox } from '@fluentui/react/lib/SearchBox'
+import { Stack, IStackTokens } from '@fluentui/react/lib/Stack'
+import { FontWeights } from '@fluentui/react/lib/Styling'
+import { Label } from '@fluentui/react/lib/Label'
+import { Toggle } from '@fluentui/react/lib/Toggle'
 import { initializeIcons } from '@fluentui/react/lib/Icons'
 import { Spinner, SpinnerSize } from '@fluentui/react/lib/Spinner'
 
@@ -55,12 +60,13 @@ const style = mergeStyleSets({
     },
     focusZoneContainer: {
         position: 'absolute',
-        marginTop: '36px !important',
+        marginTop: '2px !important',
         border: `1px solid ${semanticColors.bodyDivider}`,
-        boxShadow: '2px 2px 8px rgb(245 ,245, 245);',
+        boxShadow: '2px 2px 8px rgb(245, 245, 245)',
         borderRadius: '4px',
         flexGrow: 1,
-        zIndex: 999,
+        zIndex: 999999,
+        backgroundColor: '#fff'
     },
     focusZoneContent: {
         overflow: 'hidden',
@@ -106,6 +112,19 @@ const style = mergeStyleSets({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'flex-start',
+    },
+    focusZoneHeaderContentError: {
+        fontSize: '14px',
+        textAlign: 'left',
+        padding: '6px 8px',
+        top: '50%',
+        width: '100%',
+        backgroundColor: '#fafaFA',
+        borderRadius: '4px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        color: '#A80000'
     },
     focusZoneFooter: {
         backgroundColor: '#FFF',
@@ -234,6 +253,14 @@ const style = mergeStyleSets({
     itemIconToolTip: {
         alignSelf: 'center',
         marginLeft: 10,
+    },
+    hoverCardContainer: {
+        position: 'absolute',
+        zIndex: 1000000,
+        pointerEvents: 'auto',
+        // Default positioning that will be overridden by transform
+        left: 0,
+        top: 0
     }
 });
 
@@ -257,7 +284,6 @@ export interface FluentUIAutoCompleteProps {
 
 export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props) => {
     const [focusWidth, setFocusWidth] = useState<number>(0);
-    const containerRef = useRef<HTMLDivElement>(null);
     const getInputWidth = () => {
         let w = searchboxRef?.current?.offsetWidth;
         if (typeof w === 'number') {
@@ -270,23 +296,30 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
 
     const [value, setValue] = useState<string>(props.value || '');
     const [suggestions, setSuggestions] = useState<AddressItem[]>([]);
-    const [isLoading, setIsLoading] = useState<boolean>(false);
     const [hoveredItem, setHoveredItem] = useState<AddressItem | null>(null);
     const [hoveredItemIndex, setHoveredItemIndex] = useState<number>(-1);
-    const [isLoadingHover, setIsLoadingHover] = useState<boolean>(false);
+    const [hoveredItemPosition, setHoveredItemPosition] = useState<{ top: number; height: number } | null>(null);
     const [hasUserInteracted, setHasUserInteracted] = useState<boolean>(false);
     const [countryRestrictionEnabled, setCountryRestrictionEnabled] = useState<boolean>(Boolean(props.countryRestriction && props.countryRestriction.trim()));
+    
+    // Use refs for loading and selection state like the working example
+    const isLoading = useRef<boolean>(false);
     const isSelected = useRef<boolean>(Boolean(props.value && props.value.trim()));
     const searchboxRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const hoverTimeoutRef = useRef<number | null>(null);
     const debouncedValue = useDebounce<string>(value, DEBOUNCE_DELAY);
 
     const handleSearch = (evt: ChangeEvent<HTMLInputElement> | undefined) => {
         if (evt !== undefined) {
-            setIsLoading(true);
-            isSelected.current = false;
-            setHasUserInteracted(true);
-            setValue(evt.target.value);
+            const newValue = evt.target.value;
+            // Only trigger search if the value actually changed
+            if (newValue !== value) {
+                isLoading.current = true;
+                isSelected.current = false;
+                setHasUserInteracted(true);
+                setValue(newValue);
+            }
         }
     };
 
@@ -299,7 +332,7 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                 // Ensure apiToken is not undefined
                 if (!props.apiToken) {
                     console.error('AutoComplete - API Token is not provided');
-                    setIsLoading(false);
+                    isLoading.current = false;
                     setSuggestions([]);
                     return;
                 }
@@ -320,31 +353,44 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                     }));
 
                     console.log('AutoComplete - Mapped AddressItems:', addressItems);
+                    console.log('AutoComplete - Setting suggestions, count:', addressItems.length);
 
-                    setIsLoading(false);
+                    isLoading.current = false;
                     setSuggestions(addressItems);
+
+                    console.log('AutoComplete - Suggestions set, dropdown should show for', addressItems.length, 'items');
                 } else {
                     console.error('AutoComplete - Google Places API Error:', response.status);
-                    setIsLoading(false);
+                    isLoading.current = false;
                     setSuggestions([]);
                 }
             } catch (error) {
                 console.error('AutoComplete - Error fetching address suggestions:', error);
-                setIsLoading(false);
+                isLoading.current = false;
                 setSuggestions([]);
             }
         }
 
         if (hasUserInteracted && !isSelected.current && debouncedValue.length > MIN_SEARCH_LENGTH) {
             console.log('AutoComplete - Fetching address suggestions for:', debouncedValue);
-            setIsLoading(true);
+            isLoading.current = true;
             setSuggestions([]);
             fetchSuggestions();
         } else {
             console.log('AutoComplete - Not fetching - hasUserInteracted:', hasUserInteracted, 'isSelected:', isSelected.current, 'length:', debouncedValue.length);
-            setIsLoading(false);
+            isLoading.current = false;
             setSuggestions([]);
         }
+
+        // Debug logging for dropdown visibility
+        console.log('AutoComplete - Dropdown state:', {
+            suggestionsLength: suggestions.length,
+            isLoading: isLoading.current,
+            debouncedValueLength: debouncedValue.length,
+            hasUserInteracted,
+            isSelected: isSelected.current,
+            focusWidth
+        });
 
         getInputWidth();
     }, [debouncedValue, props.apiToken, hasUserInteracted, countryRestrictionEnabled]);
@@ -363,15 +409,30 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
             }
         };
 
+        const handleScroll = () => {
+            // Position will be recalculated automatically with relative positioning
+        };
+
+        const handleResize = () => {
+            getInputWidth(); // Recalculate width on resize
+        };
+
         document.addEventListener('mousedown', handleClickOutside);
+        window.addEventListener('scroll', handleScroll, true);
+        window.addEventListener('resize', handleResize);
+        
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('resize', handleResize);
         };
     }, []);
 
     const onClear = () => {
         setValue('');
         setSuggestions([]);
+        setHasUserInteracted(false); // Reset interaction state when clearing
+        isSelected.current = false;
         const emptyAddress: ParsedAddress = {
             fullAddress: '',
             street: '',
@@ -379,8 +440,8 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
             city: '',
             state: '',
             country: '',
-            latitude: '',
-            longitude: '',
+            latitude: undefined,
+            longitude: undefined,
             building: '',
             postcode: ''
         };
@@ -422,8 +483,8 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                         city: '',
                         state: '',
                         country: '',
-                        latitude: '',
-                        longitude: '',
+                        latitude: undefined,
+                        longitude: undefined,
                         building: '',
                         postcode: ''
                     };
@@ -442,8 +503,8 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                     city: '',
                     state: '',
                     country: '',
-                    latitude: '',
-                    longitude: '',
+                    latitude: undefined,
+                    longitude: undefined,
                     building: '',
                     postcode: ''
                 };
@@ -451,8 +512,6 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
             }
         }
     };
-
-    const [hoveredItemPosition, setHoveredItemPosition] = useState<{ top: number; height: number } | null>(null);
 
     const onItemHover = (item: AddressItem, index: number) => {
         // Clear any existing hide timeout
@@ -535,8 +594,8 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
             city: '',
             state: '',
             country: '',
-            latitude: '',
-            longitude: '',
+            latitude: undefined,
+            longitude: undefined,
             building: '',
             postcode: ''
         };
@@ -544,172 +603,142 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
     };
 
     return (
-        <ThemeProvider theme={theme}>
-            <div ref={containerRef}>
-                <Stack className={style.stackContainer} tokens={stackTokens}>
-                    <div ref={searchboxRef}>
+        <div>
+            <div ref={searchboxRef}>
+                <ThemeProvider theme={theme}>
+                    <Stack className={style.stackContainer} tokens={stackTokens}>
                         <SearchBox
                             className={style.searchBox}
                             placeholder="Search for an address..."
                             value={value}
                             onChange={handleSearch}
                             onClear={onClear}
-                            onFocus={() => setHasUserInteracted(true)}
                             iconProps={searchIcon}
                             disabled={props.isDisabled}
                         />
+                    </Stack>
+                </ThemeProvider>
+            </div>
+
+            {/* FocusZone Section/Dropdown */}
+            {suggestions.length > 0 && (
+                <FocusZone
+                    direction={FocusZoneDirection.vertical}
+                    className={style.focusZoneContainer}
+                    style={{ width: focusWidth }}
+                >
+                    {console.log('AutoComplete - Rendering dropdown with', suggestions.length, 'suggestions')}
+                    <div className={style.focusZoneContent}>
+                        {suggestions.map((item, index) => renderDropdown(item, index))}
                     </div>
 
-                    {/* Loading indicator separate from dropdown */}
-                    {isLoading && suggestions.length === 0 && (
-                        <div className={style.focusZoneContainer} style={{ width: focusWidth }}>
-                            <div className={style.focusZoneHeader}>
-                                <div className={style.focusZoneHeaderContent}>
-                                    <Spinner size={SpinnerSize.small} labelPosition="right" label="Searching..." />
-                                </div>
-                            </div>
+                    <div className={style.focusZoneFooter}>
+                        <div className={style.focusZoneFooterLeft}>
+                            <Label style={{ fontSize: '12px', margin: 0, color: '#666', fontWeight: 'normal' }}>
+                                Powered by Google™
+                            </Label>
                         </div>
-                    )}
-
-                    {/* No results found */}
-                    {!isLoading && suggestions.length === 0 && debouncedValue.length > MIN_SEARCH_LENGTH && (
-                        <div className={style.focusZoneContainer} style={{ width: focusWidth }}>
-                            <div className={style.focusZoneHeader}>
-                                <div className={style.focusZoneHeaderContent} style={{ color: '#A80000' }}>
-                                    No results found
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {suggestions.length > 0 && (
-                        <div className={style.focusZoneContainer} style={{ width: focusWidth }}>
-                            <FocusZone direction={FocusZoneDirection.vertical}>
-                                <div className={style.focusZoneContent}>
-                                    {suggestions.map((item, index) => renderDropdown(item, index))}
-                                </div>
-                            </FocusZone>
-
-                            <div className={style.focusZoneFooter}>
-                                <div className={style.focusZoneFooterLeft}>
-                                    <Label style={{ fontSize: '12px', margin: 0, color: '#666', fontWeight: 'normal' }}>
-                                        Powered by Google™
+                        <div className={style.focusZoneFooterRight}>
+                            {props.countryRestriction && props.countryRestriction.trim() ? (
+                                <Stack horizontal tokens={{ childrenGap: 8 }} verticalAlign="center">
+                                    <Label style={{ fontSize: '12px', margin: 0, color: '#666' }}>
+                                        Search Restriction:
                                     </Label>
-                                </div>
-                                <div className={style.focusZoneFooterRight}>
-                                    {props.countryRestriction && props.countryRestriction.trim() ? (
-                                        <Stack horizontal tokens={{ childrenGap: 8 }} verticalAlign="center">
-                                            <Label style={{ fontSize: '12px', margin: 0, color: '#666' }}>
-                                                Search Restriction:
-                                            </Label>
-                                            <Toggle
-                                                checked={countryRestrictionEnabled}
-                                                onChange={(event, checked) => {
-                                                    setCountryRestrictionEnabled(!!checked);
-                                                    // Clear current suggestions to force a new search with updated restriction
-                                                    if (hasUserInteracted && value.length > MIN_SEARCH_LENGTH) {
-                                                        setSuggestions([]);
-                                                        setIsLoading(true);
-                                                    }
-                                                }}
-                                                inlineLabel
-                                                onText={`${props.countryRestriction.toUpperCase()}`}
-                                                offText="Worldwide"
-                                                styles={{
-                                                    root: { marginBottom: 0 },
-                                                    label: { fontSize: '12px' },
-                                                    text: { fontSize: '12px' }
-                                                }}
-                                            />
-                                        </Stack>
-                                    ) : (
-                                        <ActionButton className={style.focusZoneBtn} iconProps={dropBtnTwo}>
-                                            Worldwide Search
-                                        </ActionButton>
-                                    )}
-                                </div>
-                            </div>
+                                    <Toggle
+                                        checked={countryRestrictionEnabled}
+                                        onChange={(event, checked) => {
+                                            setCountryRestrictionEnabled(!!checked);
+                                            // Clear current suggestions to force a new search with updated restriction
+                                            if (hasUserInteracted && value.length > MIN_SEARCH_LENGTH) {
+                                                setSuggestions([]);
+                                                isLoading.current = true;
+                                            }
+                                        }}
+                                        inlineLabel
+                                        onText={`${props.countryRestriction.toUpperCase()}`}
+                                        offText="Worldwide"
+                                        styles={{
+                                            root: { marginBottom: 0 },
+                                            label: { fontSize: '12px' },
+                                            text: { fontSize: '12px' }
+                                        }}
+                                    />
+                                </Stack>
+                            ) : (
+                                <ActionButton className={style.focusZoneBtn} iconProps={dropBtnTwo}>
+                                    Worldwide Search
+                                </ActionButton>
+                            )}
                         </div>
-                    )}
+                    </div>
+                </FocusZone>
+            )}
 
-                    {/* Hover Card with Bridge */}
-                    {hoveredItem && props.apiToken && (
-                        <>
-                            {/* Invisible bridge area between dropdown and hover card */}
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    left: focusWidth,
-                                    top: 36,
-                                    width: '30px', // Bridge width
-                                    height: '400px', // Cover the entire dropdown height
-                                    zIndex: 1000, // Below the hover card but above other elements
-                                    backgroundColor: 'transparent'
-                                }}
-                                onMouseEnter={() => {
-                                    // Keep hover card visible when mouse enters bridge
-                                    console.log('Mouse entered bridge area');
-                                    if (hoverTimeoutRef.current) {
-                                        clearTimeout(hoverTimeoutRef.current);
-                                        hoverTimeoutRef.current = null;
-                                    }
-                                }}
-                                onMouseLeave={() => {
-                                    // Start hide timeout when leaving bridge
-                                    console.log('Mouse left bridge area');
-                                    if (hoverTimeoutRef.current) {
-                                        clearTimeout(hoverTimeoutRef.current);
-                                    }
-                                    hoverTimeoutRef.current = window.setTimeout(() => {
-                                        console.log('Hiding hover card after bridge leave timeout');
-                                        setHoveredItem(null);
-                                        setHoveredItemIndex(-1);
-                                        setHoveredItemPosition(null);
-                                    }, 100);
-                                }}
-                            />
+            {/* Loading indicator */}
+            {isLoading.current && suggestions.length === 0 && hasUserInteracted && debouncedValue.length > MIN_SEARCH_LENGTH && (
+                <FocusZone
+                    direction={FocusZoneDirection.vertical}
+                    className={style.focusZoneContainer}
+                    style={{ width: focusWidth }}
+                >
+                    <div className={style.focusZoneHeader}>
+                        <div className={style.focusZoneHeaderContent}>
+                            <Spinner size={SpinnerSize.small} labelPosition="right" label="Searching..." />
+                        </div>
+                    </div>
+                </FocusZone>
+            )}
 
-                            {/* Actual hover card */}
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    left: focusWidth + 30, // Moved further away (30px gap)
-                                    top: 36,
-                                    zIndex: 1001
-                                }}
-                                onMouseEnter={() => {
-                                    // Keep hover card visible when mouse enters it
-                                    console.log('Mouse entered hover card');
-                                    if (hoverTimeoutRef.current) {
-                                        clearTimeout(hoverTimeoutRef.current);
-                                        hoverTimeoutRef.current = null;
-                                    }
-                                }}
-                                onMouseLeave={() => {
-                                    // Hide hover card when mouse leaves it
-                                    console.log('Mouse left hover card');
-                                    if (hoverTimeoutRef.current) {
-                                        clearTimeout(hoverTimeoutRef.current);
-                                    }
-                                    hoverTimeoutRef.current = window.setTimeout(() => {
-                                        console.log('Hiding hover card after card leave timeout');
-                                        setHoveredItem(null);
-                                        setHoveredItemIndex(-1);
-                                        setHoveredItemPosition(null);
-                                    }, 100);
-                                }}
-                            >
-                                <EntityHoverCard
-                                    placeId={hoveredItem.placeId}
-                                    apiKey={props.apiToken}
-                                    onLoading={setIsLoadingHover}
-                                    arrowPosition={hoveredItemPosition?.top || 24}
-                                />
-                            </div>
-                        </>
-                    )}
-                </Stack>
-            </div>
-        </ThemeProvider>
+            {/* No results found */}
+            {!isLoading.current && suggestions.length === 0 && debouncedValue.length > MIN_SEARCH_LENGTH && hasUserInteracted && (
+                <FocusZone
+                    direction={FocusZoneDirection.vertical}
+                    className={style.focusZoneContainer}
+                    style={{ width: focusWidth }}
+                >
+                    <div className={style.focusZoneHeader}>
+                        <div className={style.focusZoneHeaderContentError}>
+                            No results found
+                        </div>
+                    </div>
+                </FocusZone>
+            )}
+
+            {/* EntityHoverCard for showing place details */}
+            {hoveredItem && hoveredItemPosition && (
+                <div
+                    className={style.hoverCardContainer}
+                    ref={(element) => {
+                        if (element) {
+                            element.style.transform = `translate(${focusWidth + 10}px, ${hoveredItemPosition.top - 24}px)`;
+                        }
+                    }}
+                    onMouseEnter={() => {
+                        // Clear any existing timeout when hovering over the card
+                        if (hoverTimeoutRef.current) {
+                            clearTimeout(hoverTimeoutRef.current);
+                            hoverTimeoutRef.current = null;
+                        }
+                    }}
+                    onMouseLeave={() => {
+                        // Hide the card when leaving it
+                        if (hoverTimeoutRef.current) {
+                            clearTimeout(hoverTimeoutRef.current);
+                        }
+                        hoverTimeoutRef.current = window.setTimeout(() => {
+                            setHoveredItem(null);
+                            setHoveredItemIndex(-1);
+                            setHoveredItemPosition(null);
+                        }, 100);
+                    }}
+                >
+                    <EntityHoverCard
+                        placeId={hoveredItem.placeId}
+                        apiKey={props.apiToken || ''}
+                        arrowPosition={hoveredItemPosition.height / 2}
+                    />
+                </div>
+            )}
+        </div>
     );
 };

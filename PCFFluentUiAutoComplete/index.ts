@@ -18,8 +18,8 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 	public _city: string | undefined;
 	public _state: string | undefined;
 	public _country: string | undefined;
-	public _latitude: string | undefined;
-	public _longitude: string | undefined;
+	public _latitude: number | undefined;
+	public _longitude: number | undefined;
 	public _building: string | undefined;
 	public _postcode: string | undefined;
 	private _googleMapsScript: HTMLScriptElement | null = null;
@@ -152,8 +152,8 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 			this._city = parsedAddress.city || '';
 			this._state = parsedAddress.state || '';
 			this._country = parsedAddress.country || '';
-			this._latitude = parsedAddress.latitude || '';
-			this._longitude = parsedAddress.longitude || '';
+			this._latitude = parsedAddress.latitude;
+			this._longitude = parsedAddress.longitude;
 			this._building = parsedAddress.building || '';
 			this._postcode = parsedAddress.postcode || '';
 		}
@@ -163,8 +163,8 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 			this._city = "";
 			this._state = "";
 			this._country = "";
-			this._latitude = "";
-			this._longitude = "";
+			this._latitude = undefined;
+			this._longitude = undefined;
 			this._building = "";
 			this._postcode = "";
 		}

@@ -78,6 +78,13 @@ The setup process automatically adds these convenient npm scripts to your `packa
 | `npm run boom-create` | PCF project creator | Creates new PCF project structure |
 | `npm run boom-upgrade` | Update tool | Checks for and installs latest version |
 
+## 📚 Documentation
+
+- **[BUNDLE-OPTIMIZATION.md](./BUNDLE-OPTIMIZATION.md)** - Comprehensive guide to reducing PCF bundle sizes by up to 69%
+- **[CHANGELOG.md](./CHANGELOG.md)** - Recent updates and version history
+- **[GETTING-STARTED.md](./GETTING-STARTED.md)** - Step-by-step setup guide
+- **[YAML-XML-MAPPING.md](./YAML-XML-MAPPING.md)** - Configuration reference
+
 ## ⚡ Quick Start After Installation
 
 Once installed, you have access to several convenient npm scripts:
@@ -130,6 +137,9 @@ If you prefer direct PowerShell execution:
 ### Core Features
 - 🔄 **GitHub Actions** and **Azure DevOps** support (independent of each other)
 - 📝 **YAML-driven configuration** - one file controls everything
+- 🎯 **Bundle Size Optimization** - automatic production builds reduce bundle size by up to 69%
+- ⚡ **Smart Build Mode Selection** - automatically uses production builds for Release, development for Debug
+- 🔧 **FluentUI Import Optimization** - supports optimized import patterns for smaller bundles
 - 🔧 **Custom build scripts** - add your own pre/post build logic
 - 🎯 **Environment detection** - automatically adapts to CI/CD platform
 - 📦 **Automated packaging** - creates Power Platform solution packages
@@ -205,6 +215,66 @@ npm version major  # 1.1.0 → 2.0.0
 ```
 
 **Release Tags:** Use the format `v{version}` (e.g., `v1.2.3`) for official releases.
+
+## 🎯 Bundle Size Optimization
+
+The build system automatically optimizes your PCF bundle size for production builds, often reducing bundle size by **up to 69%**. Here's how it works:
+
+### Automatic Build Mode Selection
+
+| Configuration | Bundle Mode | Bundle Size | Use Case |
+|---------------|-------------|-------------|----------|
+| **Release** (`npm run boom`) | Production | ~1.7MB | Deployment to Power Platform |
+| **Debug** (`npm run boom-debug`) | Development | ~5.4MB | Local testing and debugging |
+
+### FluentUI Import Optimization
+
+**❌ Don't do this (pulls entire library):**
+```typescript
+import { ThemeProvider, SearchBox, Stack } from '@fluentui/react'
+```
+
+**✅ Do this instead (tree-shakeable imports):**
+```typescript
+import { ThemeProvider } from '@fluentui/react/lib/Theme'
+import { SearchBox } from '@fluentui/react/lib/SearchBox'
+import { Stack } from '@fluentui/react/lib/Stack'
+```
+
+### Package.json Optimization
+
+The build system works best when your `package.json` includes these optimized scripts:
+
+```json
+{
+  "scripts": {
+    "build": "pcf-scripts build --buildMode production",
+    "build:dev": "pcf-scripts build"
+  },
+  "dependencies": {
+    "@fluentui/react": "^8.123.1",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
+  }
+}
+```
+
+### Bundle Size Results
+
+**Before optimization:**
+- Bundle: 5.4MB
+- Solution package: 951KB
+
+**After optimization:**
+- Bundle: 1.7MB (**69% smaller**)
+- Solution package: 467KB (**51% smaller**)
+
+### Performance Benefits
+
+- ⚡ **Faster loading** in Power Platform environments
+- 📱 **Better mobile performance** 
+- 💾 **Reduced solution package size**
+- 🚀 **Improved user experience**
 
 # Custom scripts (optional)
 scripts:

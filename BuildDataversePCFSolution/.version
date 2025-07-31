@@ -1,5 +1,12 @@
 {
-    "installedDate":  "2025-07-27 15:11:28",
-    "version":  "2025.07.27.01",
-    "repository":  "https://github.com/garethcheyne/BuildDataversePCFSolution.git"
+    "installedDate":  "2025-07-31 11:15:00",
+    "version":  "2025.07.31.01",
+    "repository":  "https://github.com/garethcheyne/BuildDataversePCFSolution.git",
+    "features": [
+        "Production build mode optimization",
+        "FluentUI import optimization support",
+        "Bundle size reduction (up to 69%)",
+        "Automatic build mode selection",
+        "Standard PCF output directory support"
+    ]
 }

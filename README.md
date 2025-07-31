@@ -2,7 +2,7 @@
 
 A powerful PowerApps Component Framework (PCF) control that provides Google Places autocomplete functionality with React and FluentUI. This control integrates seamlessly with Dataverse and offers advanced features like hover cards with Google Maps integration, country restrictions, and comprehensive address parsing.
 
-![PCF Control Preview](./screenshots/screenshot.png)
+![PCF Control Preview](./screenshots/screenshot01.png)
 
 ## ✨ Features
 
@@ -30,11 +30,13 @@ A powerful PowerApps Component Framework (PCF) control that provides Google Plac
 - **Building Information**: Premise/building details when available
 - **Flexible Formats**: Choose between full names or abbreviations for states/countries
 
-## 🚀 Quick Start
+## 🚀 Quick Start & Build System
+
+This project uses the **BuildDataversePCFSolution** CI/CD system for automated building, packaging, and deployment.
 
 ### Prerequisites
 - Power Platform CLI installed
-- Node.js (version 14 or higher)
+- Node.js (version 18 or higher)
 - Google Places API key with Places API enabled
 - Power Platform environment with PCF controls enabled
 
@@ -51,10 +53,91 @@ A powerful PowerApps Component Framework (PCF) control that provides Google Plac
    npm install
    ```
 
-3. **Build the control**
+3. **Build and package for Power Platform**
    ```bash
-   npm run build
+   # Quick release build (most common)
+   npm run boom
+   
+   # Debug build for development
+   npm run boom-debug
+   
+   # Build only managed solution
+   npm run boom-managed
+   
+   # Build only unmanaged solution
+   npm run boom-unmanaged
    ```
+
+## 🔧 Build System (BuildDataversePCFSolution)
+
+This project includes an advanced CI/CD system that automates PCF control building and packaging:
+
+### Available Build Commands
+
+| Command | Purpose | Output |
+|---------|---------|---------|
+| `npm run boom` | **Production build** (Release configuration, both packages) | `releases/PCFFluentUiAutoCompleteGooglePlaces_v{version}_managed.zip`<br>`releases/PCFFluentUiAutoCompleteGooglePlaces_v{version}_unmanaged.zip` |
+| `npm run boom-debug` | Development build with debug symbols | Debug packages for testing |
+| `npm run boom-managed` | Managed solution only (for production deployment) | Managed package only |
+| `npm run boom-unmanaged` | Unmanaged solution only (for customization) | Unmanaged package only |
+| `npm run boom-check` | Validate development environment | Environment check report |
+| `npm run boom-upgrade` | Check for system updates | Update BuildDataversePCFSolution |
+
+### Build Configuration
+
+The build system is configured via `solution.yaml`:
+
+```yaml
+solution:
+  name: "PCFFluentUiAutoCompleteGooglePlaces"
+  displayName: "PCF FluentUI Google Address AutoComplete"
+  version: "2025.7.30.01"
+  projectGuid: "5e9de1b4-a755-483b-9a09-7aaf6e2836d1"
+
+publisher:
+  name: "err403"
+  displayName: "err403.com (Gareth Cheyne)"
+  prefix: "err403"
+
+package:
+  createManaged: true
+  createUnmanaged: true
+```
+
+### 🔄 Automatic Version Management
+
+The build system includes **intelligent auto-incrementing version control** that eliminates manual version updates:
+
+#### **Version Format & Logic**
+- **Format**: `major.minor.patch` (e.g., `1.0.2`, `0.1.15`, `2.3.47`)
+- **Auto-Increment**: Each build automatically increments the patch version
+- **Smart Rollover**: Handles version boundaries intelligently
+
+#### **Version Increment Examples**
+
+| Current Version | Next Build | Action Taken |
+|----------------|------------|--------------|
+| `1.0.2` | `1.0.3` | Normal patch increment |
+| `0.0.98` | `0.0.99` | Normal patch increment |
+| `0.0.99` | `0.1.0` | **Minor rollover** (patch resets to 0) |
+| `0.1.99` | `0.2.0` | **Minor rollover** |
+| `0.99.99` | `1.0.0` | **Major rollover** (minor resets to 0) |
+| `1.0.0` | `1.0.1` | Normal patch increment |
+
+#### **How It Works**
+1. **Reads Current Version**: Parses version from `ControlManifest.Input.xml`
+2. **Increments Intelligently**: Applies rollover logic at 99 boundaries
+3. **Synchronizes Files**: Updates both `ControlManifest.Input.xml` and `package.json`
+4. **PCF Compatible**: No leading zeros, follows semantic versioning
+
+#### **Benefits**
+- ✅ **No Manual Updates**: Version bumps automatically on each build
+- ✅ **Consistent Versioning**: Both manifest and package stay synchronized  
+- ✅ **PCF Compliant**: Meets all Power Platform version requirements
+- ✅ **Scalable**: Handles thousands of builds (up to 99.99.99)
+- ✅ **Error Recovery**: Falls back to 0.0.1 if version format is unrecognized
+
+**Note**: The version in `solution.yaml` is no longer used for PCF files - the system now uses auto-incrementing versions starting from your current `ControlManifest.Input.xml` version.
 
 4. **Test locally (optional)**
    ```bash

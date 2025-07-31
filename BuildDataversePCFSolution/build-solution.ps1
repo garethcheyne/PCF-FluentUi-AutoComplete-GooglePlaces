@@ -50,9 +50,11 @@ $ErrorActionPreference = "Stop"
 if ([string]::IsNullOrEmpty($CiMode)) {
     if ($env:GITHUB_ACTIONS -eq "true") {
         $CiMode = "GitHub"
-    } elseif ($env:TF_BUILD -eq "True") {
+    }
+    elseif ($env:TF_BUILD -eq "True") {
         $CiMode = "DevOps"
-    } else {
+    }
+    else {
         $CiMode = "Local"
     }
 }
@@ -62,9 +64,11 @@ function Write-Info {
     param($Message) 
     if ($CiMode -eq "DevOps") {
         Write-Host "##[section]INFO: $Message"
-    } elseif ($CiMode -eq "GitHub") {
+    }
+    elseif ($CiMode -eq "GitHub") {
         Write-Host "::notice::$Message"
-    } else {
+    }
+    else {
         Write-Host "INFO: $Message" -ForegroundColor Cyan 
     }
 }
@@ -73,9 +77,11 @@ function Write-Success {
     param($Message) 
     if ($CiMode -eq "DevOps") {
         Write-Host "##[section]SUCCESS: $Message"
-    } elseif ($CiMode -eq "GitHub") {
+    }
+    elseif ($CiMode -eq "GitHub") {
         Write-Host "::notice::✅ $Message"
-    } else {
+    }
+    else {
         Write-Host "SUCCESS: $Message" -ForegroundColor Green 
     }
 }
@@ -84,9 +90,11 @@ function Write-Warning {
     param($Message) 
     if ($CiMode -eq "DevOps") {
         Write-Host "##[warning]WARNING: $Message"
-    } elseif ($CiMode -eq "GitHub") {
+    }
+    elseif ($CiMode -eq "GitHub") {
         Write-Host "::warning::$Message"
-    } else {
+    }
+    else {
         Write-Host "WARNING: $Message" -ForegroundColor Yellow 
     }
 }
@@ -95,9 +103,11 @@ function Write-BuildError {
     param($Message) 
     if ($CiMode -eq "DevOps") {
         Write-Host "##[error]ERROR: $Message"
-    } elseif ($CiMode -eq "GitHub") {
+    }
+    elseif ($CiMode -eq "GitHub") {
         Write-Host "::error::$Message"
-    } else {
+    }
+    else {
         Write-Host "ERROR: $Message" -ForegroundColor Red 
     }
 }
@@ -155,11 +165,14 @@ function Resolve-Template {
     $resolved = $Template
     
     # Replace {{section.key}} patterns
-    $resolved = $resolved -replace '\{\{solution\.name\}\}', $Config.solution.name
+    $resolved = $resolved -replace '\{\{solution\.name\}\}', $Config.solution.uniqueName
+    $resolved = $resolved -replace '\{\{solution\.uniqueName\}\}', $Config.solution.uniqueName
     $resolved = $resolved -replace '\{\{solution\.displayName\}\}', $Config.solution.displayName
     $resolved = $resolved -replace '\{\{solution\.version\}\}', $Config.solution.version
-    $resolved = $resolved -replace '\{\{publisher\.name\}\}', $Config.publisher.name
-    $resolved = $resolved -replace '\{\{publisher\.prefix\}\}', $Config.publisher.prefix
+    $resolved = $resolved -replace '\{\{publisher\.name\}\}', $Config.publisher.uniqueName
+    $resolved = $resolved -replace '\{\{publisher\.uniqueName\}\}', $Config.publisher.uniqueName
+    $resolved = $resolved -replace '\{\{publisher\.prefix\}\}', $Config.publisher.customizationPrefix
+    $resolved = $resolved -replace '\{\{publisher\.customizationPrefix\}\}', $Config.publisher.customizationPrefix
     
     return $resolved
 }
@@ -176,11 +189,13 @@ try {
         Write-Info "Azure DevOps Build detected (TF_BUILD: $env:TF_BUILD)"
         Write-Info "Build ID: $env:BUILD_BUILDID"
         Write-Info "Build Number: $env:BUILD_BUILDNUMBER"
-    } elseif ($CiMode -eq "GitHub") {
+    }
+    elseif ($CiMode -eq "GitHub") {
         Write-Info "GitHub Actions detected (GITHUB_ACTIONS: $env:GITHUB_ACTIONS)"
         Write-Info "Workflow: $env:GITHUB_WORKFLOW"
         Write-Info "Run ID: $env:GITHUB_RUN_ID"
-    } else {
+    }
+    else {
         Write-Info "Local build environment"
     }
     
@@ -188,11 +203,11 @@ try {
     $config = Parse-YamlFile -FilePath $ConfigFile
     
     # Override config values with command line parameters
-    $baseSolutionName = if ($SolutionName) { $SolutionName } else { $config.solution.name }
+    $baseSolutionName = if ($SolutionName) { $SolutionName } else { $config.solution.uniqueName }
     $solutionVersion = $config.solution.version
     $finalSolutionName = "${baseSolutionName}_v${solutionVersion}"
-    $finalPublisherName = if ($PublisherName) { $PublisherName } else { $config.publisher.name }
-    $finalPublisherPrefix = if ($PublisherPrefix) { $PublisherPrefix } else { $config.publisher.prefix }
+    $finalPublisherName = if ($PublisherName) { $PublisherName } else { $config.publisher.uniqueName }
+    $finalPublisherPrefix = if ($PublisherPrefix) { $PublisherPrefix } else { $config.publisher.customizationPrefix }
     $finalCleanBuild = if ($PSBoundParameters.ContainsKey('CleanBuild')) { $CleanBuild } else { $config.build.cleanBuild -eq "true" }
     $finalSolutionType = if ($PSBoundParameters.ContainsKey('SolutionType')) { $SolutionType } else { 
         if ($config.build.solutionType) { $config.build.solutionType } else { "Both" }
@@ -257,15 +272,109 @@ try {
     $npmCmd = if ($config.build.npmCommand) { $config.build.npmCommand } else { "ci" }
     if (Test-Path "package-lock.json") {
         & npm $npmCmd
-    } else {
+    }
+    else {
         & npm install
     }
     if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
     Write-Success "Dependencies installed"
     
+    # Step 3.5: Auto-increment version numbers
+    Write-Info "Auto-incrementing version numbers..."
+    
+    # Read current version from ControlManifest.Input.xml and increment it
+    $manifestPath = Join-Path $projectRoot "PCFFluentUiAutoComplete\ControlManifest.Input.xml"
+    if (Test-Path $manifestPath) {
+        try {
+            # Load XML to get current version
+            [xml]$manifestXml = Get-Content $manifestPath -Raw
+            $controlNode = $manifestXml.manifest.control
+            
+            if ($controlNode) {
+                $currentVersion = $controlNode.GetAttribute("version")
+                Write-Info "Current version: $currentVersion"
+                
+                # Parse version (expected format: x.y.z)
+                if ($currentVersion -match '^(\d+)\.(\d+)\.(\d+)$') {
+                    $major = [int]$matches[1]
+                    $minor = [int]$matches[2] 
+                    $patch = [int]$matches[3]
+                    
+                    # Increment version with rollover logic
+                    $patch++
+                    
+                    # Handle rollover: 0.0.99 -> 0.1.0
+                    if ($patch -gt 99) {
+                        $patch = 0
+                        $minor++
+                        
+                        # Handle rollover: 0.99.x -> 1.0.0  
+                        if ($minor -gt 99) {
+                            $minor = 0
+                            $major++
+                        }
+                    }
+                    
+                    $newVersion = "$major.$minor.$patch"
+                    
+                    Write-Info "Incrementing to version: $newVersion"
+                    
+                    # Update control version
+                    $controlNode.SetAttribute("version", $newVersion)
+                    
+                    # Save with proper XML formatting
+                    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+                    $xmlWriterSettings = New-Object System.Xml.XmlWriterSettings
+                    $xmlWriterSettings.Encoding = $utf8NoBom
+                    $xmlWriterSettings.Indent = $true
+                    $xmlWriterSettings.IndentChars = "  "
+                    $xmlWriterSettings.NewLineChars = "`r`n"
+                    $xmlWriterSettings.OmitXmlDeclaration = $false
+                    
+                    $xmlWriter = [System.Xml.XmlWriter]::Create($manifestPath, $xmlWriterSettings)
+                    $manifestXml.Save($xmlWriter)
+                    $xmlWriter.Close()
+                    
+                    Write-Success "Updated ControlManifest.Input.xml to version $newVersion"
+                    
+                    # Update package.json with same version
+                    $packageJsonPath = Join-Path $projectRoot "package.json" 
+                    if (Test-Path $packageJsonPath) {
+                        $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
+                        $packageJson.version = $newVersion
+                        $packageJson | ConvertTo-Json -Depth 10 | Set-Content $packageJsonPath -NoNewline
+                        Write-Success "Updated package.json to version $newVersion"
+                    }
+                    
+                } else {
+                    Write-Warning "Version format not recognized: $currentVersion. Expected format: x.y.z"
+                    Write-Info "Using default version 0.0.1"
+                    $newVersion = "0.0.1"
+                    $controlNode.SetAttribute("version", $newVersion)
+                    $manifestXml.Save($manifestPath)
+                }
+            } else {
+                Write-Warning "Could not find control element in ControlManifest.Input.xml"
+            }
+        } catch {
+            Write-Warning "Failed to auto-increment version: $($_.Exception.Message)"
+        }
+    } else {
+        Write-Warning "ControlManifest.Input.xml not found at $manifestPath"
+    }
+    
     # Step 4: Build PCF control
     Write-Info "Building PCF control..."
-    $buildCmd = if ($config.build.pcfBuildCommand) { $config.build.pcfBuildCommand } else { "build" }
+    
+    # Determine build command based on configuration
+    if ($config.build.pcfBuildCommand) {
+        $buildCmd = $config.build.pcfBuildCommand
+    } elseif ($BuildConfiguration -eq "Release") {
+        $buildCmd = "build"  # Uses production mode from package.json
+    } else {
+        $buildCmd = "build:dev"  # Uses development mode
+    }
+    
     & npm run $buildCmd
     if ($LASTEXITCODE -ne 0) { throw "PCF build failed" }
     Write-Success "PCF control built successfully"
@@ -285,7 +394,9 @@ try {
     Write-Info "Checking Power Platform CLI..."
     try {
         $pacVersion = & pac --version 2>&1
-        Write-Success "PAC CLI available: $($pacVersion -join ' ')"
+        # Split on + and show first part only (version without build hash)
+        $versionString = ($pacVersion -join ' ').Split('+')[0]
+        Write-Success "PAC CLI available: $versionString"
     }
     catch {
         Write-Error "Power Platform CLI not found. Installing..."
@@ -293,7 +404,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Failed to install PAC CLI" }
         Write-Success "PAC CLI installed"
     }
-    
+
     # Step 7: Create solution folder
     $tempDir = if ($config.solutionStructure.tempDirectory) { $config.solutionStructure.tempDirectory } else { "solution" }
     Write-Info "Creating solution structure in: $tempDir"
@@ -313,6 +424,23 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Solution initialization failed" }
     Write-Success "Solution initialized"
     
+    # Step 8.5: Update ProjectGuid if specified in solution.yaml
+    if ($config.solution.projectGuid) {
+        Write-Info "Updating ProjectGuid from solution.yaml..."
+        $solutionProjPath = Get-ChildItem -Filter "*.cdsproj" | Select-Object -First 1 -ExpandProperty FullName
+        if ($solutionProjPath) {
+            $projectContent = Get-Content $solutionProjPath -Raw
+            $oldGuidPattern = '<ProjectGuid>[^<]+</ProjectGuid>'
+            $newGuidValue = "<ProjectGuid>$($config.solution.projectGuid)</ProjectGuid>"
+            $projectContent = $projectContent -replace $oldGuidPattern, $newGuidValue
+            $projectContent | Set-Content $solutionProjPath -Encoding UTF8
+            Write-Success "ProjectGuid updated to: $($config.solution.projectGuid)"
+        }
+        else {
+            Write-Warning "Solution project file not found - cannot update ProjectGuid"
+        }
+    }
+    
     # Step 9: List solution contents for debugging
     Write-Info "Solution contents:"
     Get-ChildItem | ForEach-Object { Write-Host "  - $($_.Name)" }
@@ -324,11 +452,176 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Failed to add PCF reference" }
     Write-Success "PCF control added to solution"
     
-    # Step 11: Build solution
-    Write-Info "Building solution (Configuration: $BuildConfiguration)..."
-    & dotnet build --configuration $BuildConfiguration
-    if ($LASTEXITCODE -ne 0) { throw "Solution build failed" }
-    Write-Success "Solution built successfully"
+    # Step 10.5: Update Solution.xml with comprehensive solution information from solution.yaml BEFORE building
+    if ($config.solution.uniqueName) {
+        Write-Info "Updating Solution.xml with solution information from solution.yaml..."
+        $solutionXmlPath = "src\Other\Solution.xml"
+        if (Test-Path $solutionXmlPath) {
+            # Load XML using proper XML parser
+            [xml]$xmlDoc = Get-Content $solutionXmlPath -Raw -Encoding UTF8
+            
+            # Update Solution UniqueName
+            $solutionManifest = $xmlDoc.ImportExportXml.SolutionManifest
+            $solutionManifest.UniqueName = $config.solution.uniqueName
+            Write-Info "Updated solution UniqueName to: $($config.solution.uniqueName)"
+            
+            # Update Solution Version
+            $solutionVersion = if ($config.solution.version) { $config.solution.version } else { "1.0.0.0" }
+            $solutionManifest.Version = $solutionVersion
+            Write-Info "Updated solution Version to: $solutionVersion"
+            
+            # Update Solution Display Name
+            if ($config.solution.localizedName) {
+                $localizedName = $solutionManifest.LocalizedNames.LocalizedName | Where-Object { $_.languagecode -eq "1033" }
+                if ($localizedName) {
+                    $localizedName.description = $config.solution.localizedName
+                    Write-Info "Updated solution LocalizedName to: $($config.solution.localizedName)"
+                }
+            }
+            
+            # Update Solution Description
+            if ($config.solution.description) {
+                # Check if Descriptions node exists, create if not
+                if (-not $solutionManifest.Descriptions) {
+                    $descriptionsNode = $xmlDoc.CreateElement("Descriptions")
+                    $solutionManifest.AppendChild($descriptionsNode) | Out-Null
+                }
+                
+                # Check if Description element exists, create if not
+                $description = $solutionManifest.Descriptions.Description | Where-Object { $_.languagecode -eq "1033" }
+                if (-not $description) {
+                    $description = $xmlDoc.CreateElement("Description")
+                    $description.SetAttribute("description", $config.solution.description)
+                    $description.SetAttribute("languagecode", "1033")
+                    $solutionManifest.Descriptions.AppendChild($description) | Out-Null
+                } else {
+                    $description.description = $config.solution.description
+                }
+                Write-Info "Updated solution Description to: $($config.solution.description)"
+            }
+            
+            # Update Publisher Information
+            $publisher = $solutionManifest.Publisher
+            $publisher.UniqueName = $config.publisher.uniqueName
+            Write-Info "Updated publisher UniqueName to: $($config.publisher.uniqueName)"
+            
+            # Update Publisher Display Name
+            if ($config.publisher.localizedName) {
+                $publisherLocalizedName = $publisher.LocalizedNames.LocalizedName | Where-Object { $_.languagecode -eq "1033" }
+                if ($publisherLocalizedName) {
+                    $publisherLocalizedName.description = $config.publisher.localizedName
+                    Write-Info "Updated publisher LocalizedName to: $($config.publisher.localizedName)"
+                }
+            }
+            
+            # Update Publisher Description
+            if ($config.publisher.description) {
+                $publisherDescription = $publisher.Descriptions.Description | Where-Object { $_.languagecode -eq "1033" }
+                if ($publisherDescription) {
+                    $publisherDescription.description = $config.publisher.description
+                    Write-Info "Updated publisher Description to: $($config.publisher.description)"
+                }
+            }
+            
+            # Update Customization Prefix
+            if ($config.publisher.customizationPrefix) {
+                $publisher.CustomizationPrefix = $config.publisher.customizationPrefix
+                Write-Info "Updated CustomizationPrefix to: $($config.publisher.customizationPrefix)"
+            }
+            
+            # Set Solution.xml to unmanaged initially (0) - we'll handle packaging separately
+            # This ensures the source solution is always unmanaged, and managed packages are created via PAC CLI
+            $managedValue = 0  # Always start with unmanaged
+            Write-Info "Setting Solution.xml to unmanaged mode for proper packaging"
+            $solutionManifest.Managed = $managedValue.ToString()
+            
+            # Update RootComponent for PCF control (type="66" is for CustomControl)
+            $rootComponents = $solutionManifest.RootComponents
+            if ($rootComponents) {
+                # Clear existing root components
+                $rootComponents.RemoveAll()
+                
+                # Add our PCF control root component
+                $rootComponent = $xmlDoc.CreateElement("RootComponent")
+                $rootComponent.SetAttribute("type", "66")
+                $rootComponent.SetAttribute("schemaName", "$($config.publisher.customizationPrefix).PCFFluentUiAutoCompleteGooglePlaces")
+                $rootComponent.SetAttribute("behavior", "0")
+                $rootComponents.AppendChild($rootComponent) | Out-Null
+                Write-Info "Updated RootComponent with schemaName: $($config.publisher.customizationPrefix).PCFFluentUiAutoCompleteGooglePlaces"
+            }
+            
+            # Save the updated XML with proper formatting
+            $xmlSettings = New-Object System.Xml.XmlWriterSettings
+            $xmlSettings.Indent = $true
+            $xmlSettings.IndentChars = "  "
+            $xmlSettings.NewLineChars = "`r`n"
+            $xmlSettings.Encoding = [System.Text.Encoding]::UTF8
+            
+            $xmlWriter = [System.Xml.XmlWriter]::Create($solutionXmlPath, $xmlSettings)
+            try {
+                $xmlDoc.WriteTo($xmlWriter)
+                Write-Info "Successfully updated Solution.xml with proper XML formatting"
+            }
+            finally {
+                $xmlWriter.Close()
+            }
+            Write-Success "Solution.xml updated with comprehensive solution information:"
+            Write-Info "  - Solution Name: $($config.solution.uniqueName)"
+            Write-Info "  - Version: $solutionVersion"  
+            Write-Info "  - Publisher: $($config.publisher.localizedName)"
+            Write-Info "  - Prefix: $($config.publisher.customizationPrefix)"
+            Write-Info "  - Managed Mode: $managedValue (Unmanaged)"
+            Write-Info "  - Root Component: $($config.publisher.customizationPrefix).PCFFluentUiAutoCompleteGooglePlaces"
+        } else {
+            Write-Warning "Solution.xml file not found - cannot update solution information"
+        }
+    }
+    
+    # Step 11: Build solution to ensure PCF control files are copied to solution structure
+    Write-Info "Building solution to copy PCF control files..."
+    $buildConfig = $BuildConfiguration.ToLower()
+    & dotnet build --configuration $BuildConfiguration --verbosity minimal
+    if ($LASTEXITCODE -ne 0) { 
+        Write-Warning "Solution build had issues, but continuing with packaging..."
+        Write-Info "The build may have failed due to managed/unmanaged package type conflicts, but PCF files should still be built."
+    }
+    else {
+        Write-Success "Solution built successfully"
+    }
+    
+    # Step 11.5: Verify and copy PCF control files to src for packaging
+    $controlsOutPath = "../out/controls"
+    $controlsSrcPath = "src/Controls"
+    
+    if (Test-Path $controlsOutPath) {
+        Write-Success "PCF control files found in build output: $controlsOutPath"
+        Get-ChildItem $controlsOutPath -Recurse | ForEach-Object { Write-Host "    - $($_.FullName.Replace($PWD, '.'))" }
+        
+        # Copy control files from out to src for solution packaging
+        Write-Info "Copying PCF control files from $controlsOutPath to $controlsSrcPath..."
+        if (-not (Test-Path $controlsSrcPath)) {
+            New-Item -ItemType Directory -Path $controlsSrcPath -Force | Out-Null
+        }
+        Copy-Item -Path "$controlsOutPath/*" -Destination $controlsSrcPath -Recurse -Force
+        Write-Success "PCF control files copied to solution src directory"
+        
+        # Verify files were copied
+        if (Test-Path $controlsSrcPath) {
+            Write-Info "Verifying copied control files:"
+            Get-ChildItem $controlsSrcPath -Recurse | ForEach-Object { Write-Host "    - $($_.FullName.Replace($PWD, '.'))" }
+        }
+    }
+    else {
+        Write-Warning "PCF control files not found at expected build output location: $controlsOutPath"
+        Write-Info "Checking for alternative control file locations..."
+        $alternativePaths = @("bin/Release", "obj/Release", "out")
+        foreach ($altPath in $alternativePaths) {
+            if (Test-Path $altPath) {
+                Write-Info "Found files at: $altPath"
+                Get-ChildItem $altPath -Recurse -File | ForEach-Object { Write-Host "    - $($_.FullName.Replace($PWD, '.'))" }
+            }
+        }
+    }
     
     # Step 12: Pack solution(s) based on SolutionType
     Write-Info "Packaging solution(s) - Type: $finalSolutionType..."
@@ -340,18 +633,19 @@ try {
         $unmanagedName = "${finalSolutionName}_unmanaged"
         $unmanagedPath = "../releases/$unmanagedName.zip"
         
-        # Try to find built solution first
-        $solutionFiles = Get-ChildItem -Path "bin/$BuildConfiguration" -Filter "*.zip" -ErrorAction SilentlyContinue
-        if ($solutionFiles.Count -gt 0) {
-            $sourceSolution = $solutionFiles[0].FullName
-            Copy-Item $sourceSolution $unmanagedPath -Force
-            Write-Success "Unmanaged solution packaged from build output: releases/$unmanagedName.zip"
-        } else {
-            # Fallback to manual packing
-            & pac solution pack --zipfile $unmanagedPath --folder src
-            if ($LASTEXITCODE -ne 0) { throw "Unmanaged solution packaging failed" }
-            Write-Success "Unmanaged solution packaged: releases/$unmanagedName.zip"
+        # Ensure Solution.xml is set to unmanaged before packing
+        $solutionXmlPath = "src\Other\Solution.xml"
+        if (Test-Path $solutionXmlPath) {
+            $xmlContent = Get-Content $solutionXmlPath -Raw -Encoding UTF8
+            $xmlContent = $xmlContent -replace '<Managed>\d+</Managed>', '<Managed>0</Managed>'
+            $xmlContent | Set-Content $solutionXmlPath -Encoding UTF8
+            Write-Info "Set Solution.xml to unmanaged mode (0) for unmanaged package"
         }
+        
+        # For unmanaged solutions, use pac solution pack without packagetype (defaults to unmanaged)
+        & pac solution pack --zipfile $unmanagedPath --folder src
+        if ($LASTEXITCODE -ne 0) { throw "Unmanaged solution packaging failed" }
+        Write-Success "Unmanaged solution packaged: releases/$unmanagedName.zip"
         $createdPackages += "releases/$unmanagedName.zip"
     }
     
@@ -360,7 +654,16 @@ try {
         $managedName = "${finalSolutionName}_managed"
         $managedPath = "../releases/$managedName.zip"
         
-        # For managed solutions, we need to use pac solution pack with --packagetype Managed and specify the src folder
+        # For managed solutions, set Solution.xml to managed, then use pac solution pack
+        $solutionXmlPath = "src\Other\Solution.xml"
+        if (Test-Path $solutionXmlPath) {
+            $xmlContent = Get-Content $solutionXmlPath -Raw -Encoding UTF8
+            $xmlContent = $xmlContent -replace '<Managed>\d+</Managed>', '<Managed>1</Managed>'
+            $xmlContent | Set-Content $solutionXmlPath -Encoding UTF8
+            Write-Info "Set Solution.xml to managed mode (1) for managed package"
+        }
+        
+        # Use pac solution pack with --packagetype Managed
         & pac solution pack --zipfile $managedPath --packagetype Managed --folder src
         if ($LASTEXITCODE -ne 0) { throw "Managed solution packaging failed" }
         Write-Success "Managed solution packaged: releases/$managedName.zip"
@@ -379,25 +682,27 @@ try {
         foreach ($package in $createdPackages) {
             if (Test-Path $package) {
                 $zipSize = (Get-Item $package).Length
-                $sizeKB = [math]::Round($zipSize/1KB, 2)
+                $sizeKB = [math]::Round($zipSize / 1KB, 2)
                 $totalSize += $zipSize
                 
                 # Validate minimum package size
                 $minSize = if ($config.validation.solutionValidation.minPackageSize) { 
                     [int]$config.validation.solutionValidation.minPackageSize 
-                } else { 1024 }
+                }
+                else { 1024 }
                 
                 if ($zipSize -lt $minSize) {
                     Write-Warning "Solution package size ($sizeKB KB) is smaller than expected minimum ($([math]::Round($minSize/1KB, 2)) KB) for $package"
                 }
                 
                 Write-Host "  - $package ($sizeKB KB)"
-            } else {
+            }
+            else {
                 Write-Warning "Expected package not found: $package"
             }
         }
         
-        $totalSizeKB = [math]::Round($totalSize/1KB, 2)
+        $totalSizeKB = [math]::Round($totalSize / 1KB, 2)
         Write-Info "Total package size: $totalSizeKB KB"
         
         # List all build outputs
@@ -422,7 +727,8 @@ try {
             }
         }
         
-    } else {
+    }
+    else {
         throw "No solution packages were created"
     }
     
@@ -431,7 +737,8 @@ try {
     # Set CI-specific success indicators
     if ($CiMode -eq "DevOps") {
         Write-Host "##vso[task.complete result=Succeeded;]Build completed successfully"
-    } elseif ($CiMode -eq "GitHub") {
+    }
+    elseif ($CiMode -eq "GitHub") {
         Write-Host "::notice::✅ Build completed successfully"
     }
     
@@ -450,12 +757,14 @@ catch {
         if ($stackTrace) {
             Write-Host "##[debug]Stack trace: $stackTrace"
         }
-    } elseif ($CiMode -eq "GitHub") {
+    }
+    elseif ($CiMode -eq "GitHub") {
         Write-Host "::error::Build failed: $errorMessage"
         if ($stackTrace) {
             Write-Host "::debug::Stack trace: $stackTrace"
         }
-    } else {
+    }
+    else {
         Write-Host "Stack trace: $stackTrace" -ForegroundColor Red
     }
     

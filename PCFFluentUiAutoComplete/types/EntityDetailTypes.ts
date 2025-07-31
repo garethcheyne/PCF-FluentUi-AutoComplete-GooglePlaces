@@ -8,8 +8,8 @@ export interface ParsedAddress {
     city?: string;
     state?: string;
     country?: string;
-    latitude?: string;
-    longitude?: string;
+    latitude?: number;
+    longitude?: number;
     building?: string;
     postcode?: string;
 }
@@ -189,8 +189,8 @@ export class GooglePlacesUtils {
             city: this.getCity(place) || '',
             state: state || '',
             country: country || '',
-            latitude: this.getLatitude(place).toString(),
-            longitude: this.getLongitude(place).toString(),
+            latitude: this.getLatitude(place),
+            longitude: this.getLongitude(place),
             building: this.getPremise(place) || '',
             postcode: this.getPostalCode(place) || ''
         };
