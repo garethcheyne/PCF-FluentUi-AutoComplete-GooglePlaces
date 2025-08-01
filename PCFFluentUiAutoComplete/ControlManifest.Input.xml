@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="err403" constructor="PCFFluentUiAutoCompleteGooglePlaces" version="1.0.5" display-name-key="PCF FluentUI Google Address AutoComplete" description-key="A Google Places autocomplete control using React and FluentUI. Provides address search functionality with Google Places API integration." control-type="standard" preview-image="img/preview.png">
+  <control namespace="err403" constructor="PCFFluentUiAutoCompleteGooglePlaces" version="1.0.16" display-name-key="PCF FluentUI Google Address AutoComplete" description-key="A Google Places autocomplete control using React and FluentUI. Provides address search functionality with Google Places API integration." control-type="standard" preview-image="img/preview.png">
     <property name="apiToken" display-name-key="Google API Key" description-key="Google Places API Key for address autocomplete functionality" of-type="SingleLine.Text" usage="input" required="true" />
     <property name="countryRestriction" display-name-key="Country Restriction" description-key="Restrict search results to specific countries. Leave empty to allow all countries" of-type="SingleLine.Text" usage="input" required="false" />
     <property name="stateReturnShortName" display-name-key="State Return Short Name" description-key="Return state/region as abbreviation instead of full name" of-type="TwoOptions" usage="input" required="false" />
@@ -14,6 +14,7 @@
     <property name="longitude" display-name-key="Longitude" description-key="Longitude coordinate from selected address" of-type="FP" usage="bound" required="false" />
     <property name="building" display-name-key="Building" description-key="Building/premise from selected address" of-type="SingleLine.Text" usage="bound" required="false" />
     <property name="postcode" display-name-key="Postcode" description-key="Postal/ZIP code from selected address" of-type="SingleLine.Text" usage="bound" required="false" />
+    <property name="googlePlaceId" display-name-key="Google Place ID" description-key="Google Place ID from selected address for reference" of-type="SingleLine.Text" usage="bound" required="false" />
     <resources>
       <code path="index.ts" order="1" />
       <css path="css/PCFFluentUiAutoComplete.css" order="1" />

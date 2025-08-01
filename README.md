@@ -1,5 +1,7 @@
 # PCF FluentUI AutoComplete - Google Places
 
+## UNDER ACTIVE DEVELOPMENT DO NOT DEPLOY TO PRODUCTION !!
+
 A powerful PowerApps Component Framework (PCF) control that provides Google Places autocomplete functionality with React and FluentUI. This control integrates seamlessly with Dataverse and offers advanced features like hover cards with Google Maps integration, country restrictions, and comprehensive address parsing.
 
 ![PCF Control Preview](./screenshots/screenshot01.png)

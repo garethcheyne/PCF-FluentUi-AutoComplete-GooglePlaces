@@ -22,6 +22,7 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 	public _longitude: number | undefined;
 	public _building: string | undefined;
 	public _postcode: string | undefined;
+	public _googlePlaceId: string | undefined;
 	private _googleMapsScript: HTMLScriptElement | null = null;
 	private _isGoogleMapsLoaded: boolean = false;
 
@@ -39,7 +40,6 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 	 */
 	public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement): void {
 
-		console.debug("PCF FluentUI AutoComplete - index.ts init")
 		this._notifyOutputChanged = notifyOutputChanged;
 		this._container = container;
 		this._context = context;
@@ -58,7 +58,6 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 		return new Promise((resolve, reject) => {
 			// Check if Google Maps is already loaded
 			if (window.google && window.google.maps) {
-				console.log('PCF FluentUI AutoComplete - Google Maps API already loaded');
 				this._isGoogleMapsLoaded = true;
 				resolve();
 				return;
@@ -67,7 +66,6 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 			// Check if script is already being loaded
 			const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
 			if (existingScript) {
-				console.log('PCF FluentUI AutoComplete - Google Maps API script already exists, waiting for load');
 				existingScript.addEventListener('load', () => {
 					this._isGoogleMapsLoaded = true;
 					resolve();
@@ -76,20 +74,17 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 				return;
 			}
 
-			console.log('PCF FluentUI AutoComplete - Loading Google Maps API');
 			const script = document.createElement('script');
 			script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
 			script.async = true;
 			script.defer = true;
 
 			script.onload = () => {
-				console.log('PCF FluentUI AutoComplete - Google Maps API loaded successfully');
 				this._isGoogleMapsLoaded = true;
 				resolve();
 			};
 
 			script.onerror = (error) => {
-				console.error('PCF FluentUI AutoComplete - Failed to load Google Maps API:', error);
 				reject(new Error('Failed to load Google Maps API'));
 			};
 
@@ -106,14 +101,10 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 		// Add code to update control view
 
 		this._props.context = context;
-		this._props.isDisabled = context.mode.isControlDisabled;
 		this._props.apiToken = context.parameters.apiToken.raw || "";
-		this._props.value = context.parameters.street.raw || "";
+		this._props.isDisabled = context.mode.isControlDisabled;
 		this._props.countryRestriction = context.parameters.countryRestriction.raw || "";
-		this._props.stateReturnShortName = context.parameters.stateReturnShortName.raw || false;
-		this._props.countryReturnShortName = context.parameters.countryReturnShortName.raw || false;
-
-		console.debug("PCF FluentUI AutoComplete - index.ts updateView")
+		this._props.value = context.parameters.street.raw || "";
 
 		ReactDOM.render(
 			React.createElement(
@@ -129,7 +120,6 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 	 * @returns an object based on nomenclature defined in manifest, expecting object[s] for property marked as “bound” or “output”
 	 */
 	public getOutputs(): IOutputs {
-		console.debug("PCF FluentUI AutoComplete - index.ts getOutputs street: ", this._street)
 		return {
 			street: this._street,
 			suburb: this._suburb,
@@ -140,11 +130,11 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 			longitude: this._longitude,
 			building: this._building,
 			postcode: this._postcode,
+			googlePlaceId: this._googlePlaceId,
 		};
 	}
 
 	private updateValue(parsedAddress: ParsedAddress) {
-		console.debug("PCF FluentUI AutoComplete - index.ts updateValue", parsedAddress)
 
 		if (parsedAddress && parsedAddress.street && parsedAddress.street.trim() !== "") {
 			this._street = parsedAddress.street || '';
@@ -156,6 +146,7 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 			this._longitude = parsedAddress.longitude;
 			this._building = parsedAddress.building || '';
 			this._postcode = parsedAddress.postcode || '';
+			this._googlePlaceId = parsedAddress.googlePlaceId || '';
 		}
 		else {
 			this._street = "";
@@ -167,6 +158,7 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 			this._longitude = undefined;
 			this._building = "";
 			this._postcode = "";
+			this._googlePlaceId = "";
 		}
 
 		this._notifyOutputChanged();
@@ -182,7 +174,6 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 
 		// Clean up Google Maps script if we created it
 		if (this._googleMapsScript && this._googleMapsScript.parentNode) {
-			console.log('PCF FluentUI AutoComplete - Removing Google Maps script');
 			this._googleMapsScript.parentNode.removeChild(this._googleMapsScript);
 			this._googleMapsScript = null;
 		}

@@ -12,6 +12,7 @@ export interface ParsedAddress {
     longitude?: number;
     building?: string;
     postcode?: string;
+    googlePlaceId?: string;
 }
 
 export interface AddressComponent {
@@ -192,7 +193,8 @@ export class GooglePlacesUtils {
             latitude: this.getLatitude(place),
             longitude: this.getLongitude(place),
             building: this.getPremise(place) || '',
-            postcode: this.getPostalCode(place) || ''
+            postcode: this.getPostalCode(place) || '',
+            googlePlaceId: place.placeId || ''
         };
     }
 

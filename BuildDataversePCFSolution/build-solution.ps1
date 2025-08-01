@@ -1,34 +1,150 @@
 #!/usr/bin/env pwsh
+
+#==============================================================================
+# PCF SOLUTION BUILD SCRIPT - COMPREHENSIVE BUILD AUTOMATION
+#==============================================================================
+# This script provides complete automation for building Power Platform Custom
+# Control Framework (PCF) controls and packaging them into solution files.
+#
+# KEY FEATURES:
+# ✓ Automated version management with auto-increment
+# ✓ Comprehensive project validation and dependency checking
+# ✓ Intelligent build configuration with proper XML parsing
+# ✓ Support for Unmanaged, Managed, and Both solution types
+# ✓ CI/CD integration (GitHub Actions, Azure DevOps, Local)
+# ✓ Robust error handling and detailed logging
+# ✓ Proper root component configuration for PCF controls
+#
+# WORKFLOW OVERVIEW:
+# 1. 🔧 ENVIRONMENT SETUP: Validate tools, detect CI/CD mode
+# 2. 📁 PROJECT VALIDATION: Check structure, load configuration
+# 3. 🧹 CLEANUP: Remove previous build artifacts if needed
+# 4. 📦 DEPENDENCIES: Install npm packages and restore tools
+# 5. 🔢 VERSION MANAGEMENT: Auto-increment versions across files
+# 6. 🏗️  PCF BUILD: Compile TypeScript, bundle with webpack
+# 7. 🔨 SOLUTION CREATION: Initialize Power Platform solution structure
+# 8. ⚙️  XML CONFIGURATION: Update Solution.xml with metadata and root components
+# 9. 📋 FILE ORGANIZATION: Copy PCF files to solution structure
+# 10. 📦 PACKAGING: Create unmanaged/managed solution ZIP files
+# 11. ✅ VALIDATION: Verify outputs and report results
+#==============================================================================
+
 <#
 .SYNOPSIS
     Build PCF Control and create Power Platform solution package using solution.yaml configuration
+
 .DESCRIPTION
-    This script builds the PCF control, creates a Power Platform solution, and packages it for deployment.
-    Uses solution.yaml for configuration, making it reusable across different PCF projects.
-    Supports both GitHub Actions and Azure DevOps CI/CD environments.
+    This script provides a complete automated build pipeline for PCF controls with the following capabilities:
+    
+    🏗️  BUILD PROCESS:
+    - Validates project structure and required files
+    - Auto-increments version numbers across ControlManifest.Input.xml and package.json
+    - Builds PCF control with TypeScript compilation and webpack bundling
+    - Creates Power Platform solution structure with proper metadata
+    
+    📦 SOLUTION PACKAGING:
+    - Supports Unmanaged solutions (for development/customization environments)
+    - Supports Managed solutions (for production environments - read-only)  
+    - Can create both types in a single build process
+    - Proper XML parsing and root component configuration
+    
+    🔧 CI/CD INTEGRATION:
+    - GitHub Actions support with environment detection
+    - Azure DevOps pipeline integration
+    - Local development workflow
+    - Comprehensive error handling and logging
+    
+    ⚙️  CONFIGURATION:
+    Uses solution.yaml for project configuration including:
+    - Solution metadata (name, description, version)
+    - Publisher information (name, prefix, contact details) 
+    - Build settings (clean build, output paths)
+    - Root component definitions for PCF controls
+
 .PARAMETER ConfigFile
-    Path to the solution.yaml configuration file (default: ./solution.yaml)
+    Path to the solution.yaml configuration file 
+    Default: "./solution.yaml"
+
 .PARAMETER SolutionName
     Override solution name from config file
+    Used to customize solution naming without modifying config
+
 .PARAMETER PublisherName
     Override publisher name from config file
+    Useful for different deployment environments
+
 .PARAMETER PublisherPrefix
     Override publisher prefix from config file
+    Must be valid Power Platform customization prefix
+
 .PARAMETER CleanBuild
     Override clean build setting from config file
+    When true, removes out/ and solution/ folders before building
+    Default: $true
+
 .PARAMETER BuildConfiguration
-    Build configuration (Debug, Release) - default: Release
+    Build configuration for compilation and packaging
+    - "Debug": Development builds with source maps and debugging info
+    - "Release": Production builds with optimization and minification
+    Default: "Release"
+
 .PARAMETER SolutionType
-    Solution type to build (Managed, Unmanaged, Both) - default: Both
+    Type of solution package(s) to create:
+    - "Managed": Read-only solution for production deployment
+    - "Unmanaged": Customizable solution for development environments  
+    - "Both": Creates both managed and unmanaged packages
+    Default: "Both"
+
 .PARAMETER CiMode
-    CI/CD mode (GitHub, DevOps, Local) - auto-detected if not specified
+    CI/CD integration mode (auto-detected if not specified):
+    - "GitHub": GitHub Actions environment with specific logging
+    - "DevOps": Azure DevOps pipeline integration
+    - "Local": Interactive local development with user prompts
+    Default: Auto-detected based on environment variables
+
 .EXAMPLE
     .\build-solution.ps1
-    .\build-solution.ps1 -ConfigFile ".\custom-solution.yaml"
-    .\build-solution.ps1 -SolutionName "MyCustomSolution" -BuildConfiguration "Debug"
-    .\build-solution.ps1 -CiMode "DevOps" -BuildConfiguration "Release"
+    # Standard build with default settings (Release, Both solutions, auto-detect CI mode)
+
+.EXAMPLE
+    .\build-solution.ps1 -ConfigFile ".\custom-solution.yaml" -BuildConfiguration "Debug"
+    # Use custom config file with debug build
+
+.EXAMPLE
     .\build-solution.ps1 -SolutionType "Managed" -BuildConfiguration "Release"
-    .\build-solution.ps1 -SolutionType "Both"
+    # Create only managed solution package for production deployment
+
+.EXAMPLE
+    .\build-solution.ps1 -SolutionName "MyCustomSolution" -PublisherPrefix "custom"
+    # Override solution name and publisher prefix from config
+
+.EXAMPLE
+    .\build-solution.ps1 -CiMode "GitHub" -CleanBuild $false
+    # Force GitHub Actions mode without cleaning previous build
+
+.NOTES
+    REQUIREMENTS:
+    - PowerShell 5.1 or later
+    - Node.js 14+ and npm for PCF building
+    - Power Platform CLI (pac) for solution operations
+    - .NET SDK 6.0+ for solution building
+    
+    FILE DEPENDENCIES:
+    - solution.yaml: Solution configuration and metadata
+    - package.json: Node.js project configuration with dependencies
+    - ControlManifest.Input.xml: PCF control manifest and properties
+    - PCF source files in designated project folder
+    
+    OUTPUT FILES:
+    - out/: Compiled PCF control files
+    - solution/: Power Platform solution structure  
+    - releases/: Final solution ZIP packages
+    
+    ERROR HANDLING:
+    - Comprehensive validation of all dependencies and files
+    - Graceful error messages with troubleshooting guidance
+    - Build continues where possible, with clear failure points
+    - Exit codes for CI/CD integration
 #>
 
 param(
@@ -43,10 +159,20 @@ param(
     [string]$CiMode = ""
 )
 
-# Set error action preference
+#==============================================================================
+# 🚀 SCRIPT INITIALIZATION AND ENVIRONMENT SETUP
+#==============================================================================
+# This section handles the initial setup and environment detection needed
+# for the build process. It configures error handling, detects CI/CD mode,
+# and sets up the foundation for the rest of the build pipeline.
+#==============================================================================
+
+# Set error action preference - Stop on any error to ensure build integrity
 $ErrorActionPreference = "Stop"
 
-# Detect CI/CD environment if not specified
+# 🔍 DETECT CI/CD ENVIRONMENT
+# Auto-detect the CI/CD environment if not explicitly specified
+# This enables environment-specific optimizations and logging
 if ([string]::IsNullOrEmpty($CiMode)) {
     if ($env:GITHUB_ACTIONS -eq "true") {
         $CiMode = "GitHub"
@@ -283,7 +409,22 @@ try {
     Write-Info "Auto-incrementing version numbers..."
     
     # Read current version from ControlManifest.Input.xml and increment it
-    $manifestPath = Join-Path $projectRoot "PCFFluentUiAutoComplete\ControlManifest.Input.xml"
+    # Find the PCF control folder dynamically instead of hardcoding
+    $pcfFolders = Get-ChildItem $projectRoot -Directory | Where-Object { 
+        Test-Path (Join-Path $_.FullName "ControlManifest.Input.xml") 
+    }
+    
+    if ($pcfFolders.Count -eq 0) {
+        throw "No PCF control folder with ControlManifest.Input.xml found in project root"
+    }
+    elseif ($pcfFolders.Count -gt 1) {
+        Write-Warning "Multiple PCF control folders found. Using first one: $($pcfFolders[0].Name)"
+    }
+    
+    $pcfControlFolder = $pcfFolders[0].Name
+    $manifestPath = Join-Path $projectRoot "$pcfControlFolder\ControlManifest.Input.xml"
+    Write-Info "Using PCF control folder: $pcfControlFolder"
+    
     if (Test-Path $manifestPath) {
         try {
             # Load XML to get current version
@@ -346,20 +487,24 @@ try {
                         Write-Success "Updated package.json to version $newVersion"
                     }
                     
-                } else {
+                }
+                else {
                     Write-Warning "Version format not recognized: $currentVersion. Expected format: x.y.z"
                     Write-Info "Using default version 0.0.1"
                     $newVersion = "0.0.1"
                     $controlNode.SetAttribute("version", $newVersion)
                     $manifestXml.Save($manifestPath)
                 }
-            } else {
+            }
+            else {
                 Write-Warning "Could not find control element in ControlManifest.Input.xml"
             }
-        } catch {
+        }
+        catch {
             Write-Warning "Failed to auto-increment version: $($_.Exception.Message)"
         }
-    } else {
+    }
+    else {
         Write-Warning "ControlManifest.Input.xml not found at $manifestPath"
     }
     
@@ -369,9 +514,11 @@ try {
     # Determine build command based on configuration
     if ($config.build.pcfBuildCommand) {
         $buildCmd = $config.build.pcfBuildCommand
-    } elseif ($BuildConfiguration -eq "Release") {
+    }
+    elseif ($BuildConfiguration -eq "Release") {
         $buildCmd = "build"  # Uses production mode from package.json
-    } else {
+    }
+    else {
         $buildCmd = "build:dev"  # Uses development mode
     }
     
@@ -481,21 +628,34 @@ try {
             
             # Update Solution Description
             if ($config.solution.description) {
-                # Check if Descriptions node exists, create if not
-                if (-not $solutionManifest.Descriptions) {
+                # Check if Descriptions node exists and has content, create proper structure if not
+                $descriptionsElement = $solutionManifest.SelectSingleNode("Descriptions")
+                if (-not $descriptionsElement -or $descriptionsElement.IsEmpty) {
+                    # Remove empty Descriptions element if it exists
+                    if ($descriptionsElement) {
+                        $solutionManifest.RemoveChild($descriptionsElement) | Out-Null
+                    }
+                    
+                    # Create new Descriptions element with content
                     $descriptionsNode = $xmlDoc.CreateElement("Descriptions")
-                    $solutionManifest.AppendChild($descriptionsNode) | Out-Null
-                }
-                
-                # Check if Description element exists, create if not
-                $description = $solutionManifest.Descriptions.Description | Where-Object { $_.languagecode -eq "1033" }
-                if (-not $description) {
                     $description = $xmlDoc.CreateElement("Description")
                     $description.SetAttribute("description", $config.solution.description)
                     $description.SetAttribute("languagecode", "1033")
-                    $solutionManifest.Descriptions.AppendChild($description) | Out-Null
-                } else {
-                    $description.description = $config.solution.description
+                    $descriptionsNode.AppendChild($description) | Out-Null
+                    $solutionManifest.AppendChild($descriptionsNode) | Out-Null
+                }
+                else {
+                    # Check if Description element exists, create if not
+                    $description = $descriptionsElement.SelectSingleNode("Description[@languagecode='1033']")
+                    if (-not $description) {
+                        $description = $xmlDoc.CreateElement("Description")
+                        $description.SetAttribute("description", $config.solution.description)
+                        $description.SetAttribute("languagecode", "1033")
+                        $descriptionsElement.AppendChild($description) | Out-Null
+                    }
+                    else {
+                        $description.SetAttribute("description", $config.solution.description)
+                    }
                 }
                 Write-Info "Updated solution Description to: $($config.solution.description)"
             }
@@ -536,138 +696,207 @@ try {
             $solutionManifest.Managed = $managedValue.ToString()
             
             # Update RootComponent for PCF control (type="66" is for CustomControl)
-            $rootComponents = $solutionManifest.RootComponents
-            if ($rootComponents) {
+            $rootComponentsNode = $xmlDoc.SelectSingleNode("//RootComponents")
+            if ($rootComponentsNode) {
                 # Clear existing root components
-                $rootComponents.RemoveAll()
+                $rootComponentsNode.RemoveAll()
                 
-                # Add our PCF control root component
+                # Read control information from ControlManifest.Input.xml to build schema name dynamically
+                $controlNamespace = ""
+                $controlConstructor = ""
+                
+                # Find PCF control folder dynamically
+                $pcfFolders = Get-ChildItem $projectRoot -Directory | Where-Object { 
+                    Test-Path (Join-Path $_.FullName "ControlManifest.Input.xml") 
+                }
+                
+                if ($pcfFolders.Count -gt 0) {
+                    $pcfControlFolder = $pcfFolders[0].Name
+                    $manifestPath = Join-Path $projectRoot "$pcfControlFolder\ControlManifest.Input.xml"
+                    
+                    if (Test-Path $manifestPath) {
+                        try {
+                            [xml]$manifestXml = Get-Content $manifestPath -Raw
+                            $controlNode = $manifestXml.manifest.control
+                            
+                            if ($controlNode) {
+                                $controlNamespace = $controlNode.GetAttribute("namespace")
+                                $controlConstructor = $controlNode.GetAttribute("constructor")
+                                Write-Info "Found control in manifest: namespace='$controlNamespace', constructor='$controlConstructor'"
+                            }
+                        }
+                        catch {
+                            Write-Warning "Failed to read control information from ControlManifest.Input.xml: $($_.Exception.Message)"
+                        }
+                    }
+                }
+                
+                # Fallback to config values if manifest reading failed
+                if ([string]::IsNullOrEmpty($controlNamespace) -or [string]::IsNullOrEmpty($controlConstructor)) {
+                    Write-Warning "Could not read control information from manifest, using config fallback"
+                    $controlNamespace = $config.publisher.customizationPrefix
+                    $controlConstructor = $config.solution.uniqueName
+                }
+                
+                # Build schema name: namespace.constructor (e.g., "err403.PCFFluentUiAutoCompleteGooglePlaces")
+                $schemaName = "$controlNamespace.$controlConstructor"
+                
+                # Add our PCF control root component  
                 $rootComponent = $xmlDoc.CreateElement("RootComponent")
                 $rootComponent.SetAttribute("type", "66")
-                $rootComponent.SetAttribute("schemaName", "$($config.publisher.customizationPrefix).PCFFluentUiAutoCompleteGooglePlaces")
+                $rootComponent.SetAttribute("schemaName", $schemaName)
                 $rootComponent.SetAttribute("behavior", "0")
-                $rootComponents.AppendChild($rootComponent) | Out-Null
-                Write-Info "Updated RootComponent with schemaName: $($config.publisher.customizationPrefix).PCFFluentUiAutoCompleteGooglePlaces"
+                $rootComponentsNode.AppendChild($rootComponent) | Out-Null
+                Write-Info "Updated RootComponent with schemaName: $schemaName"
             }
             
             # Save the updated XML with proper formatting
-            $xmlSettings = New-Object System.Xml.XmlWriterSettings
-            $xmlSettings.Indent = $true
-            $xmlSettings.IndentChars = "  "
-            $xmlSettings.NewLineChars = "`r`n"
-            $xmlSettings.Encoding = [System.Text.Encoding]::UTF8
-            
-            $xmlWriter = [System.Xml.XmlWriter]::Create($solutionXmlPath, $xmlSettings)
-            try {
-                $xmlDoc.WriteTo($xmlWriter)
-                Write-Info "Successfully updated Solution.xml with proper XML formatting"
-            }
-            finally {
-                $xmlWriter.Close()
-            }
+            $xmlDoc.Save((Resolve-Path $solutionXmlPath).Path)
+            Write-Info "Successfully updated Solution.xml with proper XML formatting"
             Write-Success "Solution.xml updated with comprehensive solution information:"
             Write-Info "  - Solution Name: $($config.solution.uniqueName)"
             Write-Info "  - Version: $solutionVersion"  
             Write-Info "  - Publisher: $($config.publisher.localizedName)"
             Write-Info "  - Prefix: $($config.publisher.customizationPrefix)"
             Write-Info "  - Managed Mode: $managedValue (Unmanaged)"
-            Write-Info "  - Root Component: $($config.publisher.customizationPrefix).PCFFluentUiAutoCompleteGooglePlaces"
-        } else {
-            Write-Warning "Solution.xml file not found - cannot update solution information"
+            Write-Info "  - Root Component: $schemaName"
         }
-    }
+
+        #==============================================================================
+        # 📁 STEP 11: PCF CONTROL FILE ORGANIZATION
+        #==============================================================================  
+        # Copy the built PCF control files from the out/ directory to the solution 
+        # src/ directory structure. This step prepares files for solution packaging
+        # without using the problematic MSBuild process that causes managed/unmanaged
+        # conflicts.
+        #==============================================================================
     
-    # Step 11: Build solution to ensure PCF control files are copied to solution structure
-    Write-Info "Building solution to copy PCF control files..."
-    $buildConfig = $BuildConfiguration.ToLower()
-    & dotnet build --configuration $BuildConfiguration --verbosity minimal
-    if ($LASTEXITCODE -ne 0) { 
-        Write-Warning "Solution build had issues, but continuing with packaging..."
-        Write-Info "The build may have failed due to managed/unmanaged package type conflicts, but PCF files should still be built."
-    }
-    else {
-        Write-Success "Solution built successfully"
-    }
+        # 📋 COPY PCF FILES TO SOLUTION STRUCTURE
+        # Instead of using dotnet build (which has managed/unmanaged conflicts),
+        # we directly copy the already-built PCF files to the solution structure
+        Write-Info "Copying PCF control files from ../out/controls to src/Controls..."
+        $controlsOutPath = "../out/controls"
+        $controlsSrcPath = "src/Controls"
     
-    # Step 11.5: Verify and copy PCF control files to src for packaging
-    $controlsOutPath = "../out/controls"
-    $controlsSrcPath = "src/Controls"
-    
-    if (Test-Path $controlsOutPath) {
-        Write-Success "PCF control files found in build output: $controlsOutPath"
-        Get-ChildItem $controlsOutPath -Recurse | ForEach-Object { Write-Host "    - $($_.FullName.Replace($PWD, '.'))" }
+        if (Test-Path $controlsOutPath) {
+            Write-Success "PCF control files found in build output: $controlsOutPath"
+            Get-ChildItem $controlsOutPath -Recurse | ForEach-Object { Write-Host "    - $($_.FullName.Replace($PWD, '.'))" }
         
-        # Copy control files from out to src for solution packaging
-        Write-Info "Copying PCF control files from $controlsOutPath to $controlsSrcPath..."
-        if (-not (Test-Path $controlsSrcPath)) {
-            New-Item -ItemType Directory -Path $controlsSrcPath -Force | Out-Null
-        }
-        Copy-Item -Path "$controlsOutPath/*" -Destination $controlsSrcPath -Recurse -Force
-        Write-Success "PCF control files copied to solution src directory"
+            # Copy control files from out to src for solution packaging
+            Write-Info "Copying PCF control files from $controlsOutPath to $controlsSrcPath..."
+            if (-not (Test-Path $controlsSrcPath)) {
+                New-Item -ItemType Directory -Path $controlsSrcPath -Force | Out-Null
+            }
+            Copy-Item -Path "$controlsOutPath/*" -Destination $controlsSrcPath -Recurse -Force
+            Write-Success "PCF control files copied to solution src directory"
         
-        # Verify files were copied
-        if (Test-Path $controlsSrcPath) {
-            Write-Info "Verifying copied control files:"
-            Get-ChildItem $controlsSrcPath -Recurse | ForEach-Object { Write-Host "    - $($_.FullName.Replace($PWD, '.'))" }
-        }
-    }
-    else {
-        Write-Warning "PCF control files not found at expected build output location: $controlsOutPath"
-        Write-Info "Checking for alternative control file locations..."
-        $alternativePaths = @("bin/Release", "obj/Release", "out")
-        foreach ($altPath in $alternativePaths) {
-            if (Test-Path $altPath) {
-                Write-Info "Found files at: $altPath"
-                Get-ChildItem $altPath -Recurse -File | ForEach-Object { Write-Host "    - $($_.FullName.Replace($PWD, '.'))" }
+            # Verify files were copied
+            if (Test-Path $controlsSrcPath) {
+                Write-Info "Verifying copied control files:"
+                Get-ChildItem $controlsSrcPath -Recurse | ForEach-Object { Write-Host "    - $($_.FullName.Replace($PWD, '.'))" }
             }
         }
-    }
-    
-    # Step 12: Pack solution(s) based on SolutionType
-    Write-Info "Packaging solution(s) - Type: $finalSolutionType..."
-    $buildConfig = $BuildConfiguration.ToLower()
-    $createdPackages = @()
-    
-    if ($finalSolutionType -eq "Unmanaged" -or $finalSolutionType -eq "Both") {
-        Write-Info "Creating unmanaged solution package..."
-        $unmanagedName = "${finalSolutionName}_unmanaged"
-        $unmanagedPath = "../releases/$unmanagedName.zip"
-        
-        # Ensure Solution.xml is set to unmanaged before packing
-        $solutionXmlPath = "src\Other\Solution.xml"
-        if (Test-Path $solutionXmlPath) {
-            $xmlContent = Get-Content $solutionXmlPath -Raw -Encoding UTF8
-            $xmlContent = $xmlContent -replace '<Managed>\d+</Managed>', '<Managed>0</Managed>'
-            $xmlContent | Set-Content $solutionXmlPath -Encoding UTF8
-            Write-Info "Set Solution.xml to unmanaged mode (0) for unmanaged package"
+        else {
+            Write-Warning "PCF control files not found at expected build output location: $controlsOutPath"
+            Write-Info "Checking for alternative control file locations..."
+            $alternativePaths = @("bin/Release", "obj/Release", "out")
+            foreach ($altPath in $alternativePaths) {
+                if (Test-Path $altPath) {
+                    Write-Info "Found files at: $altPath"
+                    Get-ChildItem $altPath -Recurse -File | ForEach-Object { Write-Host "    - $($_.FullName.Replace($PWD, '.'))" }
+                }
+            }
         }
-        
-        # For unmanaged solutions, use pac solution pack without packagetype (defaults to unmanaged)
-        & pac solution pack --zipfile $unmanagedPath --folder src
-        if ($LASTEXITCODE -ne 0) { throw "Unmanaged solution packaging failed" }
-        Write-Success "Unmanaged solution packaged: releases/$unmanagedName.zip"
-        $createdPackages += "releases/$unmanagedName.zip"
-    }
     
-    if ($finalSolutionType -eq "Managed" -or $finalSolutionType -eq "Both") {
-        Write-Info "Creating managed solution package..."
-        $managedName = "${finalSolutionName}_managed"
-        $managedPath = "../releases/$managedName.zip"
+        #==============================================================================
+        # 📦 STEP 12: SOLUTION PACKAGING
+        #==============================================================================
+        # This section handles the creation of the final solution ZIP packages.
+        # It supports three packaging modes:
+        # 
+        # 🔓 UNMANAGED SOLUTIONS:
+        #   - For development and customization environments
+        #   - Allows modification of components after import
+        #   - Solution.xml <Managed> set to 0
+        #   - Uses: pac solution pack (defaults to unmanaged)
+        #
+        # 🔒 MANAGED SOLUTIONS: 
+        #   - For production environments
+        #   - Components are read-only after import
+        #   - Solution.xml <Managed> set to 1
+        #   - Uses: pac solution pack --packagetype Managed
+        #
+        # 📦 BOTH MODE:
+        #   - Creates separate unmanaged and managed packages
+        #   - Modifies Solution.xml appropriately for each package
+        #   - Ideal for complete deployment pipeline support
+        #==============================================================================
+
+        Write-Info "Packaging solution(s) - Type: $finalSolutionType..."
+        $buildConfig = $BuildConfiguration.ToLower()
+        $createdPackages = @()
+    
+        # 🔓 CREATE UNMANAGED SOLUTION PACKAGE
+        # Unmanaged solutions allow customization after import and are ideal for
+        # development environments where components may need to be modified
+        if ($finalSolutionType -eq "Unmanaged" -or $finalSolutionType -eq "Both") {
+            Write-Info "Creating unmanaged solution package..."
+            $unmanagedName = "${finalSolutionName}_unmanaged"
+            $unmanagedPath = "../releases/$unmanagedName.zip"
         
-        # For managed solutions, set Solution.xml to managed, then use pac solution pack
-        $solutionXmlPath = "src\Other\Solution.xml"
-        if (Test-Path $solutionXmlPath) {
-            $xmlContent = Get-Content $solutionXmlPath -Raw -Encoding UTF8
-            $xmlContent = $xmlContent -replace '<Managed>\d+</Managed>', '<Managed>1</Managed>'
-            $xmlContent | Set-Content $solutionXmlPath -Encoding UTF8
-            Write-Info "Set Solution.xml to managed mode (1) for managed package"
+            # 📝 CONFIGURE SOLUTION.XML FOR UNMANAGED PACKAGE
+            # Set the <Managed> element to 0 to indicate this is an unmanaged solution
+            $solutionXmlPath = "src\Other\Solution.xml"
+            if (Test-Path $solutionXmlPath) {
+                Write-Info "Set Solution.xml to unmanaged mode (0) for unmanaged package"
+                $xmlDoc = [xml](Get-Content $solutionXmlPath -Raw -Encoding UTF8)
+                $managedNode = $xmlDoc.SelectSingleNode("//Managed")
+                if ($managedNode) {
+                    $managedNode.InnerText = "0"
+                    $xmlDoc.Save((Resolve-Path $solutionXmlPath).Path)
+                }
+            }
+        
+            # 📦 PACKAGE UNMANAGED SOLUTION
+            # Use pac solution pack without packagetype parameter (defaults to unmanaged)
+            Write-Info "Packing Solution..."
+            & pac solution pack --zipfile $unmanagedPath --folder src
+            if ($LASTEXITCODE -ne 0) { throw "Unmanaged solution packaging failed" }
+            Write-Success "Unmanaged solution packaged: releases/$unmanagedName.zip"
+            $createdPackages += "releases/$unmanagedName.zip"
         }
+    
+        # 🔒 CREATE MANAGED SOLUTION PACKAGE
+        # Managed solutions provide read-only components for production environments
+        # Components cannot be customized after import, ensuring solution integrity
+        if ($finalSolutionType -eq "Managed" -or $finalSolutionType -eq "Both") {
+            Write-Info "Creating managed solution package..."
+            $managedName = "${finalSolutionName}_managed"
+            $managedPath = "../releases/$managedName.zip"
         
-        # Use pac solution pack with --packagetype Managed
-        & pac solution pack --zipfile $managedPath --packagetype Managed --folder src
-        if ($LASTEXITCODE -ne 0) { throw "Managed solution packaging failed" }
-        Write-Success "Managed solution packaged: releases/$managedName.zip"
-        $createdPackages += "releases/$managedName.zip"
+            # 📝 CONFIGURE SOLUTION.XML FOR MANAGED PACKAGE
+            # Set the <Managed> element to 1 to indicate this is a managed solution
+            $solutionXmlPath = "src\Other\Solution.xml"
+            if (Test-Path $solutionXmlPath) {
+                Write-Info "Set Solution.xml to managed mode (1) for managed package"
+                $xmlDoc = [xml](Get-Content $solutionXmlPath -Raw -Encoding UTF8)
+                $managedNode = $xmlDoc.SelectSingleNode("//Managed")
+                if ($managedNode) {
+                    $managedNode.InnerText = "1"
+                    $xmlDoc.Save((Resolve-Path $solutionXmlPath).Path)
+                }
+            }
+        
+            # 📦 PACKAGE MANAGED SOLUTION
+            # Use pac solution pack with explicit --packagetype Managed parameter
+            Write-Info "Packing Solution..."
+            & pac solution pack --zipfile $managedPath --packagetype Managed --folder src
+            if ($LASTEXITCODE -ne 0) { throw "Managed solution packaging failed" }
+            Write-Success "Managed solution packaged: releases/$managedName.zip"
+            $createdPackages += "releases/$managedName.zip"
+        }
+    
+        # Close the main if ($config.solution.uniqueName) block
     }
     
     # Step 13: Return to root directory
@@ -726,7 +955,6 @@ try {
                 Write-Warning "Post-build script failed: $($_.Exception.Message)"
             }
         }
-        
     }
     else {
         throw "No solution packages were created"

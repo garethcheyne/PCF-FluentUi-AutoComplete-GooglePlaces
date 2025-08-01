@@ -166,156 +166,80 @@ async function fetchPlaceDetails(placeId: string, apiKey: string): Promise<Place
             throw new Error('Google Places API not available after loading');
         }
 
-        console.log('fetchPlaceDetails - Google Places API is available, using new Place API');
+        console.log('fetchPlaceDetails - Google Places API is available, using legacy PlacesService API');
 
-        // Use the new Place API instead of deprecated PlacesService
-        // According to Google's migration guide, we should use Place.fetchFields()
-        const place = new google.maps.places.Place({
-            id: placeId,
-            requestedLanguage: 'en' // Optional: specify language preference
-        });
+        return new Promise((resolve, reject) => {
+            // Create a temporary div for the PlacesService (required by Google API)
+            const tempDiv = document.createElement('div');
+            const service = new google.maps.places.PlacesService(tempDiv);
 
-        const fieldsToFetch = [
-            'formattedAddress',
-            'location',
-            'viewport',
-            'displayName',
-            'rating',
-            'userRatingCount',
-            'websiteURI',
-            'nationalPhoneNumber',
-            'regularOpeningHours',
-            'photos',
-            'addressComponents',
-            'types',
-            'googleMapsURI'
-        ];
-
-        console.log('fetchPlaceDetails - Making Place.fetchFields request with fields:', fieldsToFetch);
-
-        try {
-            // Fetch the place details using the new API
-            await place.fetchFields({ fields: fieldsToFetch });
-
-            console.log('fetchPlaceDetails - Place.fetchFields response received');
-            console.log('fetchPlaceDetails - Place data:', place);
-
-            // Map the new Place object to our existing response structure
-            const response: PlaceDetailsResponse = {
-                result: {
-                    addressComponents: place.addressComponents?.map(component => ({
-                        longName: component.longText || '',
-                        shortName: component.shortText || '',
-                        types: component.types || []
-                    })),
-                    formattedAddress: place.formattedAddress || '',
-                    geometry: {
-                        location: {
-                            lat: place.location?.lat() || 0,
-                            lng: place.location?.lng() || 0
-                        },
-                        viewport: place.viewport ? {
-                            northeast: {
-                                lat: place.viewport.getNorthEast().lat(),
-                                lng: place.viewport.getNorthEast().lng()
-                            },
-                            southwest: {
-                                lat: place.viewport.getSouthWest().lat(),
-                                lng: place.viewport.getSouthWest().lng()
-                            }
-                        } : undefined
-                    },
-                    name: place.displayName || '',
-                    placeId: placeId,
-                    rating: place.rating || undefined,
-                    types: place.types || [],
-                    url: place.googleMapsURI || undefined,
-                    userRatingsTotal: place.userRatingCount || undefined
-                },
-                status: 'OK'
+            const request: google.maps.places.PlaceDetailsRequest = {
+                placeId: placeId,
+                fields: [
+                    'formatted_address',
+                    'geometry',
+                    'name',
+                    'rating',
+                    'user_ratings_total',
+                    'website',
+                    'formatted_phone_number',
+                    'opening_hours',
+                    'photos',
+                    'address_components',
+                    'types',
+                    'url'
+                ]
             };
 
-            console.log('fetchPlaceDetails - Successfully mapped response using new Place API');
-            return response;
-        } catch (placeError) {
-            console.error('fetchPlaceDetails - Place.fetchFields error:', placeError);
-            
-            // Fallback to the old PlacesService for compatibility during transition
-            console.log('fetchPlaceDetails - Falling back to legacy PlacesService API');
-            
-            return new Promise((resolve, reject) => {
-                // Create a temporary div for the PlacesService (required by Google API)
-                const tempDiv = document.createElement('div');
-                const service = new google.maps.places.PlacesService(tempDiv);
+            console.log('fetchPlaceDetails - Making PlacesService request:', request);
 
-                const request: google.maps.places.PlaceDetailsRequest = {
-                    placeId: placeId,
-                    fields: [
-                        'formatted_address',
-                        'geometry',
-                        'name',
-                        'rating',
-                        'user_ratings_total',
-                        'website',
-                        'formatted_phone_number',
-                        'opening_hours',
-                        'photos',
-                        'address_components',
-                        'types',
-                        'url'
-                    ]
-                };
+            service.getDetails(request, (place, status) => {
+                console.log('fetchPlaceDetails - PlacesService response status:', status);
 
-                console.log('fetchPlaceDetails - Making fallback PlacesService request:', request);
-
-                service.getDetails(request, (place, status) => {
-                    console.log('fetchPlaceDetails - PlacesService fallback response status:', status);
-
-                    if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-                        const response: PlaceDetailsResponse = {
-                            result: {
-                                addressComponents: place.address_components?.map(component => ({
-                                    longName: component.long_name,
-                                    shortName: component.short_name,
-                                    types: component.types
-                                })),
-                                formattedAddress: place.formatted_address || '',
-                                geometry: {
-                                    location: {
-                                        lat: place.geometry?.location?.lat() || 0,
-                                        lng: place.geometry?.location?.lng() || 0
-                                    },
-                                    viewport: place.geometry?.viewport ? {
-                                        northeast: {
-                                            lat: place.geometry.viewport.getNorthEast().lat(),
-                                            lng: place.geometry.viewport.getNorthEast().lng()
-                                        },
-                                        southwest: {
-                                            lat: place.geometry.viewport.getSouthWest().lat(),
-                                            lng: place.geometry.viewport.getSouthWest().lng()
-                                        }
-                                    } : undefined
+                if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+                    const response: PlaceDetailsResponse = {
+                        result: {
+                            addressComponents: place.address_components?.map(component => ({
+                                longName: component.long_name,
+                                shortName: component.short_name,
+                                types: component.types
+                            })),
+                            formattedAddress: place.formatted_address || '',
+                            geometry: {
+                                location: {
+                                    lat: place.geometry?.location?.lat() || 0,
+                                    lng: place.geometry?.location?.lng() || 0
                                 },
-                                name: place.name,
-                                placeId: place.place_id || placeId,
-                                rating: place.rating,
-                                types: place.types || [],
-                                url: place.url,
-                                userRatingsTotal: place.user_ratings_total
+                                viewport: place.geometry?.viewport ? {
+                                    northeast: {
+                                        lat: place.geometry.viewport.getNorthEast().lat(),
+                                        lng: place.geometry.viewport.getNorthEast().lng()
+                                    },
+                                    southwest: {
+                                        lat: place.geometry.viewport.getSouthWest().lat(),
+                                        lng: place.geometry.viewport.getSouthWest().lng()
+                                    }
+                                } : undefined
                             },
-                            status: status
-                        };
+                            name: place.name,
+                            placeId: place.place_id || placeId,
+                            rating: place.rating,
+                            types: place.types || [],
+                            url: place.url,
+                            userRatingsTotal: place.user_ratings_total
+                        },
+                        status: status
+                    };
 
-                        console.log('fetchPlaceDetails - Successfully mapped fallback response');
-                        resolve(response);
-                    } else {
-                        const errorMsg = `Google Places API error: ${status}`;
-                        console.error('fetchPlaceDetails - Fallback error:', errorMsg);
-                        reject(new Error(errorMsg));
-                    }
-                });
+                    console.log('fetchPlaceDetails - Successfully mapped response');
+                    resolve(response);
+                } else {
+                    const errorMsg = `Google Places API error: ${status}`;
+                    console.error('fetchPlaceDetails - Error:', errorMsg);
+                    reject(new Error(errorMsg));
+                }
             });
-        }
+        });
     } catch (error) {
         console.error('fetchPlaceDetails - Catch block error:', error);
         throw error;

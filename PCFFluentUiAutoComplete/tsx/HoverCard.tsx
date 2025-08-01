@@ -1,7 +1,13 @@
 import * as React from 'react';
 import { PlaceResult, GooglePlacesUtils } from '../types';
-import { Stack, Text, Link, Icon, Spinner, SpinnerSize } from '@fluentui/react';
+import { Stack, IStackTokens } from '@fluentui/react/lib/Stack';
+import { Text } from '@fluentui/react/lib/Text';
+import { Link } from '@fluentui/react/lib/Link';
+import { Spinner, SpinnerSize } from '@fluentui/react/lib/Spinner';
+import { Icon } from '@fluentui/react/lib/Icon';
+import { IconButton, DefaultButton } from '@fluentui/react/lib/Button';
 import { fetchPlaceDetails } from './Queries';
+import { PlaceDetailsDialog } from './PlaceDetailsDialog';
 
 /// <reference types="google.maps" />
 
@@ -9,23 +15,26 @@ import { fetchPlaceDetails } from './Queries';
 const CARD_WIDTH = 420;
 const MAP_HEIGHT = 180; // Square-ish with the card width
 
-interface EntityHoverCardProps {
+interface IHoverCardProps {
     placeId: string;
     apiKey: string;
     arrowPosition?: number;
     onLoading?: (isLoading: boolean) => void;
+    onSelect?: (placeDetails: PlaceResult) => void;
 }
 
-export const EntityHoverCard: React.FC<EntityHoverCardProps> = ({
+export const HoverCard: React.FC<IHoverCardProps> = ({
     placeId,
     apiKey,
     arrowPosition = 24,
-    onLoading
+    onLoading,
+    onSelect
 }) => {
     const [placeDetails, setPlaceDetails] = React.useState<PlaceResult | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
     const [mapLoaded, setMapLoaded] = React.useState(false);
+    const [isDialogOpen, setIsDialogOpen] = React.useState(false);
     const mapRef = React.useRef<HTMLDivElement>(null);
     const mapInstanceRef = React.useRef<google.maps.Map | null>(null);
 
@@ -47,7 +56,6 @@ export const EntityHoverCard: React.FC<EntityHoverCardProps> = ({
                     setError(`Google Places API Error: ${response.status}`);
                 }
             } catch (err) {
-                console.error('Error fetching place details:', err);
                 setError('Failed to load place details');
             } finally {
                 setIsLoading(false);
@@ -71,7 +79,7 @@ export const EntityHoverCard: React.FC<EntityHoverCardProps> = ({
             // Wait for mapRef to be available (with retry mechanism)
             let retryCount = 0;
             const maxRetries = 10;
-            
+
             while (!mapRef.current && retryCount < maxRetries && isMounted) {
                 console.log(`EntityHoverCard - Waiting for mapRef, retry ${retryCount + 1}/${maxRetries}`);
                 await new Promise(resolve => setTimeout(resolve, 50));
@@ -113,19 +121,19 @@ export const EntityHoverCard: React.FC<EntityHoverCardProps> = ({
                 };
 
                 const map = new google.maps.Map(mapRef.current, mapOptions);
-                
+
                 if (!isMounted) {
                     console.log('EntityHoverCard - Component unmounted after map creation');
                     return;
                 }
-                
+
                 mapInstanceRef.current = map;
                 console.log('EntityHoverCard - Map created successfully');
 
                 // Wait for map to be ready
                 google.maps.event.addListenerOnce(map, 'idle', () => {
                     console.log('EntityHoverCard - Map is idle and ready');
-                    
+
                     // Only update state if component is still mounted
                     if (isMounted) {
                         setMapLoaded(true);
@@ -167,13 +175,13 @@ export const EntityHoverCard: React.FC<EntityHoverCardProps> = ({
         // Cleanup function
         return () => {
             isMounted = false; // Mark component as unmounted
-            
+
             if (mapInstanceRef.current) {
                 console.log('EntityHoverCard - Cleaning up map instance');
                 try {
                     // Clear all event listeners
                     google.maps.event.clearInstanceListeners(mapInstanceRef.current);
-                    
+
                     // Clear the map container completely
                     if (mapRef.current) {
                         mapRef.current.innerHTML = '';
@@ -197,33 +205,37 @@ export const EntityHoverCard: React.FC<EntityHoverCardProps> = ({
         const country = GooglePlacesUtils.getCountry(placeDetails);
 
         return (
-            <Stack horizontalAlign="start" tokens={{ childrenGap: 4 }}>
+            <div style={{
+                display: 'flex',
+                flexDirection: 'column' as const,
+                gap: '8px'
+            }}>
                 {streetNumber && streetName && (
-                    <Text variant="small">
+                    <Text>
                         <strong>Street:</strong> {streetNumber} {streetName}
                     </Text>
                 )}
                 {city && (
-                    <Text variant="small">
+                    <Text>
                         <strong>City:</strong> {city}
                     </Text>
                 )}
                 {state && (
-                    <Text variant="small">
+                    <Text>
                         <strong>State/Region:</strong> {state}
                     </Text>
                 )}
                 {postalCode && (
-                    <Text variant="small">
+                    <Text>
                         <strong>Postal Code:</strong> {postalCode}
                     </Text>
                 )}
                 {country && (
-                    <Text variant="small">
+                    <Text>
                         <strong>Country:</strong> {country}
                     </Text>
                 )}
-            </Stack>
+            </div>
         );
     }, [placeDetails]);
 
@@ -272,9 +284,9 @@ export const EntityHoverCard: React.FC<EntityHoverCardProps> = ({
                     }}
                 />
 
-                <Stack horizontalAlign="center" verticalAlign="center" style={{ 
-                    padding: '20px', 
-                    minHeight: '200px', 
+                <Stack horizontalAlign="center" verticalAlign="center" style={{
+                    padding: '20px',
+                    minHeight: '200px',
                     width: '100%',
                     display: 'flex',
                     alignItems: 'center',
@@ -331,9 +343,9 @@ export const EntityHoverCard: React.FC<EntityHoverCardProps> = ({
                     }}
                 />
 
-                <Stack horizontalAlign="center" verticalAlign="center" style={{ 
-                    padding: '20px', 
-                    minHeight: '200px', 
+                <Stack horizontalAlign="center" verticalAlign="center" style={{
+                    padding: '20px',
+                    minHeight: '200px',
                     width: '100%',
                     display: 'flex',
                     alignItems: 'center',
@@ -393,9 +405,9 @@ export const EntityHoverCard: React.FC<EntityHoverCardProps> = ({
                     }}
                 />
 
-                <Stack horizontalAlign="center" verticalAlign="center" style={{ 
-                    padding: '20px', 
-                    minHeight: '200px', 
+                <Stack horizontalAlign="center" verticalAlign="center" style={{
+                    padding: '20px',
+                    minHeight: '200px',
                     width: '100%',
                     display: 'flex',
                     alignItems: 'center',
@@ -537,35 +549,97 @@ export const EntityHoverCard: React.FC<EntityHoverCardProps> = ({
                 )}
             </Stack>
 
-            {/* Footer Section - External Links */}
-            <div style={{ 
-                borderTop: '1px solid #e1e1e1', 
-                paddingTop: '12px', 
-                marginTop: '12px', 
+            {/* Footer Section - External Links and Expand */}
+            <div style={{
+                borderTop: '1px solid #e1e1e1',
+                paddingTop: '12px',
+                marginTop: '12px',
                 minWidth: '100%'
             }}>
-                <Stack horizontal tokens={{ childrenGap: 16 }} horizontalAlign="space-between">
+                <Stack horizontal tokens={{ childrenGap: 8 }} horizontalAlign="space-between">
                     {placeDetails.url && (
-                        <Link
-                            href={placeDetails.url}
-                            target="_blank"
-                            style={{ fontSize: '12px' }}
-                        >
-                            <Icon iconName="NavigateExternalInline" style={{ marginRight: '4px' }} />
-                            View on Maps
-                        </Link>
+                        <DefaultButton
+                            text="View on Maps"
+                            iconProps={{ iconName: 'NavigateExternalInline' }}
+                            onClick={() => window.open(placeDetails.url, '_blank')}
+                            styles={{
+                                root: {
+                                    backgroundColor: 'transparent',
+                                    border: '1px solid #0078d4',
+                                    color: '#0078d4',
+                                    minWidth: '120px',
+                                    height: '28px',
+                                    borderRadius: '14px'
+                                },
+                                rootHovered: {
+                                    backgroundColor: '#f3f2f1',
+                                    border: '1px solid #0078d4',
+                                    color: '#0078d4',
+                                    borderRadius: '14px'
+                                },
+                                rootPressed: {
+                                    backgroundColor: '#edebe9',
+                                    border: '1px solid #0078d4',
+                                    color: '#0078d4',
+                                    borderRadius: '14px'
+                                },
+                                label: {
+                                    fontSize: '12px',
+                                    fontWeight: 400
+                                },
+                                icon: {
+                                    fontSize: '12px'
+                                }
+                            }}
+                        />
                     )}
 
-                    <Link
-                        href={`https://www.google.com/search?q=${encodeURIComponent(GooglePlacesUtils.getFormattedAddress(placeDetails))}`}
-                        target="_blank"
-                        style={{ fontSize: '12px' }}
-                    >
-                        <Icon iconName="Search" style={{ marginRight: '4px' }} />
-                        Search Address
-                    </Link>
+                    <DefaultButton
+                        text="Show Details"
+                        iconProps={{ iconName: 'FullScreen' }}
+                        onClick={() => setIsDialogOpen(true)}
+                        styles={{
+                            root: {
+                                backgroundColor: 'transparent',
+                                border: '1px solid #0078d4',
+                                color: '#0078d4',
+                                minWidth: '120px',
+                                height: '28px',
+                                borderRadius: '14px'
+                            },
+                            rootHovered: {
+                                backgroundColor: '#f3f2f1',
+                                border: '1px solid #0078d4',
+                                color: '#0078d4',
+                                borderRadius: '14px'
+                            },
+                            rootPressed: {
+                                backgroundColor: '#edebe9',
+                                border: '1px solid #0078d4',
+                                color: '#0078d4',
+                                borderRadius: '14px'
+                            },
+                            label: {
+                                fontSize: '12px',
+                                fontWeight: 400
+                            },
+                            icon: {
+                                fontSize: '12px'
+                            }
+                        }}
+                    />
                 </Stack>
             </div>
+
+            {/* Place Details Dialog */}
+            {placeDetails && (
+                <PlaceDetailsDialog
+                    placeDetails={placeDetails}
+                    isOpen={isDialogOpen}
+                    onDismiss={() => setIsDialogOpen(false)}
+                    onSelect={onSelect}
+                />
+            )}
         </Stack>
     );
 };

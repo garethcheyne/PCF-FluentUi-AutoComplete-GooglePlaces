@@ -1,12 +1,13 @@
 import * as React from 'react'
 import { useDebounce } from 'usehooks-ts'
 import { IInputs } from '../generated/ManifestTypes'
-import { PlacePrediction, AddressItem, GooglePlacesUtils, ParsedAddress } from '../types'
+import { PlacePrediction, AddressItem, GooglePlacesUtils, ParsedAddress, PlaceResult } from '../types'
 import { fetchAddressSuggestions, fetchPlaceDetails } from './Queries'
-import { EntityHoverCard } from './EntityHoverCard'
+import { HoverCard } from './HoverCard'
 import { useState, useRef, useEffect, ChangeEvent } from 'react'
 import { FocusZone, FocusZoneDirection } from '@fluentui/react/lib/FocusZone'
 import { ITooltipHostStyles, } from '@fluentui/react/lib/Tooltip'
+import { Callout, DirectionalHint } from '@fluentui/react/lib/Callout'
 import { IIconProps } from '@fluentui/react/lib/Icon'
 import { mergeStyleSets, getTheme, getFocusStyle, ITheme } from '@fluentui/react/lib/Styling'
 import { ActionButton } from '@fluentui/react/lib/Button'
@@ -137,7 +138,7 @@ const style = mergeStyleSets({
     focusZoneFooterLeft: {
         width: '50%',
         textAlign: 'left',
-        paddingLeft: '4px' // Reduced padding to move "Powered by Google" further left
+        paddingLeft: '4px'
     },
     focusZoneFooterRight: {
         width: '50%',
@@ -253,14 +254,6 @@ const style = mergeStyleSets({
     itemIconToolTip: {
         alignSelf: 'center',
         marginLeft: 10,
-    },
-    hoverCardContainer: {
-        position: 'absolute',
-        zIndex: 1000000,
-        pointerEvents: 'auto',
-        // Default positioning that will be overridden by transform
-        left: 0,
-        top: 0
     }
 });
 
@@ -298,9 +291,9 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
     const [suggestions, setSuggestions] = useState<AddressItem[]>([]);
     const [hoveredItem, setHoveredItem] = useState<AddressItem | null>(null);
     const [hoveredItemIndex, setHoveredItemIndex] = useState<number>(-1);
-    const [hoveredItemPosition, setHoveredItemPosition] = useState<{ top: number; height: number } | null>(null);
     const [hasUserInteracted, setHasUserInteracted] = useState<boolean>(false);
     const [countryRestrictionEnabled, setCountryRestrictionEnabled] = useState<boolean>(Boolean(props.countryRestriction && props.countryRestriction.trim()));
+    const [calloutTarget, setCalloutTarget] = useState<HTMLElement | null>(null);
     
     // Use refs for loading and selection state like the working example
     const isLoading = useRef<boolean>(false);
@@ -326,12 +319,8 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
     useEffect(() => {
         async function fetchSuggestions() {
             try {
-                console.log('AutoComplete - Starting fetchSuggestions for:', debouncedValue);
-                console.log('AutoComplete - API Token:', props.apiToken);
-
                 // Ensure apiToken is not undefined
                 if (!props.apiToken) {
-                    console.error('AutoComplete - API Token is not provided');
                     isLoading.current = false;
                     setSuggestions([]);
                     return;
@@ -339,11 +328,7 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
 
                 const response = await fetchAddressSuggestions(debouncedValue, props.apiToken, countryRestrictionEnabled ? props.countryRestriction : undefined);
 
-                console.log('AutoComplete - Full API Response:', response);
-
                 if (response.status === 'OK') {
-                    console.log('AutoComplete - Predictions:', response.predictions);
-
                     const addressItems: AddressItem[] = response.predictions.map((prediction: PlacePrediction) => ({
                         placeId: prediction.placeId,
                         description: prediction.description,
@@ -352,45 +337,26 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                         types: prediction.types
                     }));
 
-                    console.log('AutoComplete - Mapped AddressItems:', addressItems);
-                    console.log('AutoComplete - Setting suggestions, count:', addressItems.length);
-
                     isLoading.current = false;
                     setSuggestions(addressItems);
-
-                    console.log('AutoComplete - Suggestions set, dropdown should show for', addressItems.length, 'items');
                 } else {
-                    console.error('AutoComplete - Google Places API Error:', response.status);
                     isLoading.current = false;
                     setSuggestions([]);
                 }
             } catch (error) {
-                console.error('AutoComplete - Error fetching address suggestions:', error);
                 isLoading.current = false;
                 setSuggestions([]);
             }
         }
 
         if (hasUserInteracted && !isSelected.current && debouncedValue.length > MIN_SEARCH_LENGTH) {
-            console.log('AutoComplete - Fetching address suggestions for:', debouncedValue);
             isLoading.current = true;
             setSuggestions([]);
             fetchSuggestions();
         } else {
-            console.log('AutoComplete - Not fetching - hasUserInteracted:', hasUserInteracted, 'isSelected:', isSelected.current, 'length:', debouncedValue.length);
             isLoading.current = false;
             setSuggestions([]);
         }
-
-        // Debug logging for dropdown visibility
-        console.log('AutoComplete - Dropdown state:', {
-            suggestionsLength: suggestions.length,
-            isLoading: isLoading.current,
-            debouncedValueLength: debouncedValue.length,
-            hasUserInteracted,
-            isSelected: isSelected.current,
-            focusWidth
-        });
 
         getInputWidth();
     }, [debouncedValue, props.apiToken, hasUserInteracted, countryRestrictionEnabled]);
@@ -403,6 +369,7 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                 setSuggestions([]);
                 setHoveredItem(null);
                 setHoveredItemIndex(-1);
+                setCalloutTarget(null); // Close callout
                 if (hoverTimeoutRef.current) {
                     clearTimeout(hoverTimeoutRef.current);
                 }
@@ -454,6 +421,8 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
             setSuggestions([]);
             setHoveredItem(null); // Close hover card
             setHoveredItemIndex(-1);
+            setCalloutTarget(null); // Close callout
+            setHasUserInteracted(false); // Reset interaction state to prevent "No results found"
 
             // Clear hover timeout if exists
             if (hoverTimeoutRef.current) {
@@ -494,7 +463,6 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                     props.updateValue(basicAddress);
                 }
             } catch (error) {
-                console.error('Error fetching place details:', error);
                 // Fallback to basic address if there's an error
                 const basicAddress: ParsedAddress = {
                     fullAddress: item.description,
@@ -513,6 +481,30 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
         }
     };
 
+    const handleSelectPlace = React.useCallback((placeDetails: PlaceResult) => {
+        try {
+            const parsedAddress = GooglePlacesUtils.parseAddressComponents(
+                placeDetails,
+                props.stateReturnShortName || false,
+                props.countryReturnShortName || false
+            );
+
+            // Set the input value to the street address only
+            setValue(parsedAddress.street || '');
+            
+            // Update the value through the callback
+            props.updateValue(parsedAddress);
+
+            // Close the callout and clear suggestions
+            setCalloutTarget(null);
+            setSuggestions([]);
+            setHoveredItem(null);
+            setHoveredItemIndex(-1);
+        } catch (error) {
+            // Error handled silently
+        }
+    }, [props.updateValue, props.stateReturnShortName, props.countryReturnShortName]);
+
     const onItemHover = (item: AddressItem, index: number) => {
         // Clear any existing hide timeout
         if (hoverTimeoutRef.current) {
@@ -520,31 +512,20 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
             hoverTimeoutRef.current = null;
         }
 
-        // Get the actual DOM element position
+        // Set the target element for the Callout to position against
         const itemElement = document.getElementById(`suggestion_${index}`);
         if (itemElement) {
-            const rect = itemElement.getBoundingClientRect();
-            const dropdownElement = itemElement.closest('.ms-FocusZone');
-            const dropdownRect = dropdownElement?.getBoundingClientRect();
-
-            if (dropdownRect) {
-                const relativeTop = rect.top - dropdownRect.top;
-                const centerY = relativeTop + (rect.height / 2);
-                setHoveredItemPosition({ top: centerY, height: rect.height });
-                console.log('Item position:', { relativeTop, centerY, height: rect.height });
-            }
+            setCalloutTarget(itemElement);
         }
 
         // Set the hovered item immediately (no delay)
         if (hoveredItem?.placeId !== item.placeId) {
-            console.log('Setting hovered item:', item.placeId, 'at index:', index);
             setHoveredItem(item);
             setHoveredItemIndex(index);
         }
     };
 
     const onItemHoverLeave = () => {
-        console.log('Hover leave triggered from dropdown item');
         // Clear any existing timeout
         if (hoverTimeoutRef.current) {
             clearTimeout(hoverTimeoutRef.current);
@@ -552,11 +533,9 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
 
         // Set a timeout to hide the card, but allow time for mouse to move to hover card
         hoverTimeoutRef.current = window.setTimeout(() => {
-            console.log('Hiding hover card after item leave timeout');
             setHoveredItem(null);
             setHoveredItemIndex(-1);
-            setHoveredItemPosition(null);
-            setHoveredItemPosition(null);
+            setCalloutTarget(null); // Clear callout target
         }, 200); // Increased delay to 200ms
     };
 
@@ -585,7 +564,6 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
     };
 
     const getDetail = (address: string) => {
-        console.debug(`Address selected: ${address}`);
         // This function appears to be unused, but keeping for backwards compatibility
         const basicAddress: ParsedAddress = {
             fullAddress: address,
@@ -603,7 +581,7 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
     };
 
     return (
-        <div>
+        <div ref={containerRef}>
             <div ref={searchboxRef}>
                 <ThemeProvider theme={theme}>
                     <Stack className={style.stackContainer} tokens={stackTokens}>
@@ -627,7 +605,6 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                     className={style.focusZoneContainer}
                     style={{ width: focusWidth }}
                 >
-                    {console.log('AutoComplete - Rendering dropdown with', suggestions.length, 'suggestions')}
                     <div className={style.focusZoneContent}>
                         {suggestions.map((item, index) => renderDropdown(item, index))}
                     </div>
@@ -704,40 +681,44 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                 </FocusZone>
             )}
 
-            {/* EntityHoverCard for showing place details */}
-            {hoveredItem && hoveredItemPosition && (
-                <div
-                    className={style.hoverCardContainer}
-                    ref={(element) => {
-                        if (element) {
-                            element.style.transform = `translate(${focusWidth + 10}px, ${hoveredItemPosition.top - 24}px)`;
-                        }
+            {/* EntityHoverCard using FluentUI Callout */}
+            {hoveredItem && calloutTarget && (
+                <Callout
+                    target={calloutTarget}
+                    onDismiss={() => {
+                        setHoveredItem(null);
+                        setHoveredItemIndex(-1);
+                        setCalloutTarget(null);
                     }}
+                    directionalHint={DirectionalHint.rightCenter}
+                    isBeakVisible={true}
+                    gapSpace={10}
+                    calloutMaxHeight={500}
                     onMouseEnter={() => {
-                        // Clear any existing timeout when hovering over the card
+                        // Clear any existing timeout when hovering over the callout
                         if (hoverTimeoutRef.current) {
                             clearTimeout(hoverTimeoutRef.current);
                             hoverTimeoutRef.current = null;
                         }
                     }}
                     onMouseLeave={() => {
-                        // Hide the card when leaving it
+                        // Hide the callout when leaving it
                         if (hoverTimeoutRef.current) {
                             clearTimeout(hoverTimeoutRef.current);
                         }
                         hoverTimeoutRef.current = window.setTimeout(() => {
                             setHoveredItem(null);
                             setHoveredItemIndex(-1);
-                            setHoveredItemPosition(null);
+                            setCalloutTarget(null);
                         }, 100);
                     }}
                 >
-                    <EntityHoverCard
+                    <HoverCard
                         placeId={hoveredItem.placeId}
                         apiKey={props.apiToken || ''}
-                        arrowPosition={hoveredItemPosition.height / 2}
+                        onSelect={handleSelectPlace}
                     />
-                </div>
+                </Callout>
             )}
         </div>
     );
