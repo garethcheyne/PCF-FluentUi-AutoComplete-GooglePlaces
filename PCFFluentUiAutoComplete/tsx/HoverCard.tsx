@@ -8,12 +8,74 @@ import { Icon } from '@fluentui/react/lib/Icon';
 import { IconButton, DefaultButton } from '@fluentui/react/lib/Button';
 import { fetchPlaceDetails } from './Queries';
 import { PlaceDetailsDialog } from './PlaceDetailsDialog';
+import { getTheme, mergeStyleSets } from '@fluentui/react/lib/Styling';
 
 /// <reference types="google.maps" />
 
+const theme = getTheme();
+const { palette, fonts } = theme;
+
 // Card dimensions
-const CARD_WIDTH = 420;
-const MAP_HEIGHT = 180; // Square-ish with the card width
+const CARD_WIDTH = 460;
+const MAP_HEIGHT = 160; // Slightly reduced to accommodate header
+const TOTAL_HEIGHT = 520; // Increased total height to show action buttons
+
+// Shared header styles (consistent with SettingsCallout)
+const headerStyles = mergeStyleSets({
+    header: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottom: `1px solid ${palette.neutralQuaternaryAlt}`,
+        padding: '12px 16px',
+        backgroundColor: palette.neutralLighterAlt,
+        borderRadius: '16px 16px 0 0',
+        width: '100%',
+        boxSizing: 'border-box',
+        minWidth: '100%'
+    },
+    title: {
+        fontSize: fonts.medium.fontSize,
+        fontWeight: '600',
+        color: palette.neutralPrimary,
+        margin: 0,
+        flex: 1
+    },
+    closeButton: {
+        color: palette.neutralSecondary,
+        flexShrink: 0,
+        selectors: {
+            '&:hover': {
+                backgroundColor: palette.neutralQuaternary,
+                color: palette.neutralPrimary,
+            }
+        }
+    },
+    cardContainer: {
+        padding: '0px',
+        minWidth: `${CARD_WIDTH}px`,
+        maxWidth: `${CARD_WIDTH + 20}px`,
+        backgroundColor: '#ffffff',
+        borderRadius: '16px',
+        position: 'relative',
+        zIndex: 3,
+        display: 'flex',
+        flexDirection: 'column',
+        height: 'auto',
+        maxHeight: `${TOTAL_HEIGHT}px`,
+        // Remove border since PlaceDetailsCallout already provides it
+        boxShadow: 'none', // Remove shadow since PlaceDetailsCallout handles it
+    },
+    bodyContent: {
+        padding: '16px',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'visible', // Remove scroll from body content
+        width: '100%',
+        boxSizing: 'border-box'
+    }
+});
 
 interface IHoverCardProps {
     placeId: string;
@@ -21,6 +83,9 @@ interface IHoverCardProps {
     arrowPosition?: number;
     onLoading?: (isLoading: boolean) => void;
     onSelect?: (placeDetails: PlaceResult) => void;
+    onClose?: () => void;
+    showCoordinates?: boolean;
+    showRatings?: boolean;
 }
 
 export const HoverCard: React.FC<IHoverCardProps> = ({
@@ -28,7 +93,10 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
     apiKey,
     arrowPosition = 24,
     onLoading,
-    onSelect
+    onSelect,
+    onClose,
+    showCoordinates = true,
+    showRatings = true
 }) => {
     const [placeDetails, setPlaceDetails] = React.useState<PlaceResult | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
@@ -73,42 +141,32 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
         let isMounted = true; // Track if component is still mounted
 
         const initMap = async () => {
-            console.log('EntityHoverCard - initMap called');
-            console.log('EntityHoverCard - placeDetails:', !!placeDetails);
-
             // Wait for mapRef to be available (with retry mechanism)
             let retryCount = 0;
             const maxRetries = 10;
 
             while (!mapRef.current && retryCount < maxRetries && isMounted) {
-                console.log(`EntityHoverCard - Waiting for mapRef, retry ${retryCount + 1}/${maxRetries}`);
                 await new Promise(resolve => setTimeout(resolve, 50));
                 retryCount++;
             }
 
             if (!isMounted || !mapRef.current) {
-                console.log('EntityHoverCard - Component unmounted or mapRef not available');
                 return;
             }
 
             // Google Maps API should already be loaded by the PCF control
             if (!window.google?.maps) {
-                console.error('EntityHoverCard - Google Maps API not available (should be loaded by PCF control)');
                 return;
             }
 
             const lat = GooglePlacesUtils.getLatitude(placeDetails);
             const lng = GooglePlacesUtils.getLongitude(placeDetails);
 
-            console.log('EntityHoverCard - Map coordinates:', { lat, lng });
-
             if (lat === 0 && lng === 0) {
-                console.warn('EntityHoverCard - Invalid coordinates, cannot display map');
                 return;
             }
 
             try {
-                console.log('EntityHoverCard - Creating map with element:', mapRef.current);
 
                 const mapOptions: google.maps.MapOptions = {
                     center: { lat, lng },
@@ -123,17 +181,13 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                 const map = new google.maps.Map(mapRef.current, mapOptions);
 
                 if (!isMounted) {
-                    console.log('EntityHoverCard - Component unmounted after map creation');
                     return;
                 }
 
                 mapInstanceRef.current = map;
-                console.log('EntityHoverCard - Map created successfully');
 
                 // Wait for map to be ready
                 google.maps.event.addListenerOnce(map, 'idle', () => {
-                    console.log('EntityHoverCard - Map is idle and ready');
-
                     // Only update state if component is still mounted
                     if (isMounted) {
                         setMapLoaded(true);
@@ -145,8 +199,6 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                             title: placeDetails.name || placeDetails.formattedAddress,
                             animation: google.maps.Animation.DROP
                         });
-
-                        console.log('EntityHoverCard - Marker created successfully');
 
                         // Add info window
                         const infoWindow = new google.maps.InfoWindow({
@@ -165,7 +217,7 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                 });
 
             } catch (error) {
-                console.error('EntityHoverCard - Error creating map:', error);
+                // Error creating map - silently handled
             }
         };
 
@@ -177,7 +229,6 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
             isMounted = false; // Mark component as unmounted
 
             if (mapInstanceRef.current) {
-                console.log('EntityHoverCard - Cleaning up map instance');
                 try {
                     // Clear all event listeners
                     google.maps.event.clearInstanceListeners(mapInstanceRef.current);
@@ -187,7 +238,7 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                         mapRef.current.innerHTML = '';
                     }
                 } catch (error) {
-                    console.log('EntityHoverCard - Error during cleanup:', error);
+                    // Error during cleanup - silently handled
                 }
                 mapInstanceRef.current = null;
             }
@@ -249,7 +300,7 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                     maxWidth: `${CARD_WIDTH + 20}px`,
                     backgroundColor: '#ffffff',
                     border: '1px solid #e1e1e1',
-                    borderRadius: '4px',
+                    borderRadius: '16px',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                     position: 'relative',
                     zIndex: 3
@@ -308,7 +359,7 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                     maxWidth: `${CARD_WIDTH + 20}px`,
                     backgroundColor: '#ffffff',
                     border: '1px solid #e1e1e1',
-                    borderRadius: '4px',
+                    borderRadius: '16px',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                     position: 'relative',
                     zIndex: 3
@@ -425,20 +476,7 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
     return (
         <Stack
             horizontalAlign="start"
-            style={{
-                padding: '16px',
-                minWidth: `${CARD_WIDTH}px`,
-                maxWidth: `${CARD_WIDTH + 20}px`,
-                backgroundColor: '#ffffff',
-                border: '1px solid #e1e1e1',
-                borderRadius: '4px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                position: 'relative',
-                zIndex: 3,
-                display: 'flex',
-                flexDirection: 'column',
-                height: 'auto'
-            }}
+            className={headerStyles.cardContainer}
         >
             {/* Arrow pointing to the hovered item */}
             <div
@@ -464,68 +502,81 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                     height: '0',
                     borderTop: '8px solid transparent',
                     borderBottom: '8px solid transparent',
-                    borderRight: '8px solid #e1e1e1',
+                    borderRight: `8px solid ${palette.neutralQuaternaryAlt}`,
                     zIndex: 1
                 }}
             />
 
-            {/* Place Name */}
-            {placeDetails.name && (
-                <Text variant="mediumPlus" style={{ fontWeight: 600, marginBottom: '8px' }}>
-                    {placeDetails.name}
+            {/* Header */}
+            <div className={headerStyles.header}>
+                <Text className={headerStyles.title}>
+                    {placeDetails.name || 'Place Details'}
                 </Text>
-            )}
-
-            {/* Map Container */}
-            <div
-                style={{
-                    width: '100%',
-                    height: `${MAP_HEIGHT}px`,
-                    marginBottom: '12px',
-                    border: '1px solid #e1e1e1',
-                    borderRadius: '4px',
-                    backgroundColor: '#f8f8f8',
-                    position: 'relative',
-                    overflow: 'hidden'
-                }}
-            >
-                {/* Google Maps will completely take over this div */}
-                <div
-                    ref={mapRef}
-                    style={{
-                        width: '100%',
-                        height: '100%',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0
+                <IconButton
+                    iconProps={{ iconName: 'Cancel' }}
+                    className={headerStyles.closeButton}
+                    onClick={() => {
+                        if (onClose) {
+                            onClose();
+                        }
                     }}
+                    ariaLabel="Close place details"
+                    title="Close"
                 />
-                {/* Loading overlay - positioned above the map div */}
-                {!mapLoaded && (
-                    <div
-                        style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: '#f8f8f8',
-                            zIndex: 1
-                        }}
-                    >
-                        <Text variant="small" style={{ textAlign: 'center', color: '#666', fontSize: '12px' }}>
-                            <Icon iconName="MapPin" style={{ marginRight: '4px' }} />
-                            {!placeDetails ? 'Loading place details...' : !window.google?.maps ? 'Loading Google Maps...' : 'Initializing map...'}
-                        </Text>
-                    </div>
-                )}
             </div>
 
-            {/* Place Details */}
-            <Stack horizontalAlign="start" tokens={{ childrenGap: 8 }} style={{ flex: 1 }}>
+            {/* Body Content with Padding */}
+            <div className={headerStyles.bodyContent}>
+                {/* Map Container */}
+                <div
+                    style={{
+                        width: '100%',
+                        height: `${MAP_HEIGHT}px`,
+                        marginBottom: '12px',
+                        border: `1px solid ${palette.neutralQuaternaryAlt}`,
+                        borderRadius: '8px',
+                        backgroundColor: '#f8f8f8',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}
+                >
+                    {/* Google Maps will completely take over this div */}
+                    <div
+                        ref={mapRef}
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0
+                        }}
+                    />
+                    {/* Loading overlay - positioned above the map div */}
+                    {!mapLoaded && (
+                        <div
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#f8f8f8',
+                                zIndex: 1
+                            }}
+                        >
+                            <Text variant="small" style={{ textAlign: 'center', color: '#666', fontSize: '12px' }}>
+                                <Icon iconName="MapPin" style={{ marginRight: '4px' }} />
+                                {!placeDetails ? 'Loading place details...' : !window.google?.maps ? 'Loading Google Maps...' : 'Initializing map...'}
+                            </Text>
+                        </div>
+                    )}
+                </div>
+
+                {/* Place Details */}
+                <Stack horizontalAlign="start" tokens={{ childrenGap: 8 }} style={{ flex: 1, width: '100%' }}>
                 <Text variant="small" style={{ fontWeight: 500 }}>
                     <Icon iconName="MapPin" style={{ marginRight: '4px', color: '#0078d4' }} />
                     {GooglePlacesUtils.getFormattedAddress(placeDetails)}
@@ -535,12 +586,14 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                 {renderAddressComponents()}
 
                 {/* Coordinates */}
-                <Text variant="xSmall" style={{ color: '#605E5C' }}>
-                    <strong>Coordinates:</strong> {GooglePlacesUtils.getLatitude(placeDetails).toFixed(6)}, {GooglePlacesUtils.getLongitude(placeDetails).toFixed(6)}
-                </Text>
+                {showCoordinates && (
+                    <Text variant="xSmall" style={{ color: '#605E5C' }}>
+                        <strong>Coordinates:</strong> {GooglePlacesUtils.getLatitude(placeDetails).toFixed(6)}, {GooglePlacesUtils.getLongitude(placeDetails).toFixed(6)}
+                    </Text>
+                )}
 
                 {/* Rating */}
-                {placeDetails.rating && (
+                {showRatings && placeDetails.rating && (
                     <Text variant="small">
                         <Icon iconName="FavoriteStarFill" style={{ marginRight: '4px', color: '#FFB900' }} />
                         <strong>Rating:</strong> {placeDetails.rating}/5
@@ -554,7 +607,8 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                 borderTop: '1px solid #e1e1e1',
                 paddingTop: '12px',
                 marginTop: '12px',
-                minWidth: '100%'
+                width: '100%',
+                boxSizing: 'border-box'
             }}>
                 <Stack horizontal tokens={{ childrenGap: 8 }} horizontalAlign="space-between">
                     {placeDetails.url && (
@@ -630,6 +684,7 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                     />
                 </Stack>
             </div>
+            </div> {/* Close Body Content */}
 
             {/* Place Details Dialog */}
             {placeDetails && (

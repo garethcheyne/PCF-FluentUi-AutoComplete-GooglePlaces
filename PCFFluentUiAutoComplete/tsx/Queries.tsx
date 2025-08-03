@@ -18,27 +18,20 @@ declare global {
 }
 
 function loadGooglePlacesAPI(apiKey: string): Promise<void> {
-    console.log('loadGooglePlacesAPI - Starting with apiKey:', apiKey ? `${apiKey.substring(0, 8)}...` : 'NOT PROVIDED');
-
     // Check if already loaded (like in CloseQuote.js)
     if (window.google && window.google.maps && window.google.maps.places) {
-        console.log('loadGooglePlacesAPI - Google Maps API already loaded');
         isGoogleApiLoaded = true;
         return Promise.resolve();
     }
 
     // Check if script is already being loaded
     if (document.getElementById("google-maps-script-pcf")) {
-        console.log('loadGooglePlacesAPI - Script already loading, waiting...');
         return googleApiPromise || Promise.resolve();
     }
 
     if (googleApiPromise) {
-        console.log('loadGooglePlacesAPI - Loading in progress...');
         return googleApiPromise;
     }
-
-    console.log('loadGooglePlacesAPI - Creating new Google Maps script');
 
     googleApiPromise = new Promise((resolve, reject) => {
         // Create callback function (following CloseQuote.js pattern)
@@ -46,7 +39,6 @@ function loadGooglePlacesAPI(apiKey: string): Promise<void> {
 
         // Set up global callback
         (window as any)[callbackName] = () => {
-            console.log('loadGooglePlacesAPI - Google Maps API loaded successfully via callback');
             isGoogleApiLoaded = true;
             delete (window as any)[callbackName];
             resolve();
@@ -62,39 +54,30 @@ function loadGooglePlacesAPI(apiKey: string): Promise<void> {
 
         // Add error handling (like in CloseQuote.js)
         script.onerror = function () {
-            console.error("loadGooglePlacesAPI - Failed to load Google Maps API");
             delete (window as any)[callbackName];
             reject(new Error('Failed to load Google Maps API'));
         };
 
-        console.log('loadGooglePlacesAPI - Appending script to document head');
         document.head.appendChild(script);
     });
 
     return googleApiPromise;
 }
 
-async function fetchAddressSuggestions(query: string, apiKey: string, countryRestriction?: string): Promise<GooglePlacesAutocompleteResponse> {
-    console.log('fetchAddressSuggestions - Starting with query:', query);
-    console.log('fetchAddressSuggestions - API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'NOT PROVIDED');
-    console.log('fetchAddressSuggestions - Country Restriction:', countryRestriction || 'NONE');
+async function fetchAddressSuggestions(query: string, apiKey: string, countryRestriction?: string, searchTypes?: string): Promise<GooglePlacesAutocompleteResponse> {
+    // Ensure Google Places API is loaded (following CloseQuote.js pattern)
+    await loadGooglePlacesAPI(apiKey);
 
-    try {
-        // Ensure Google Places API is loaded (following CloseQuote.js pattern)
-        await loadGooglePlacesAPI(apiKey);
+    if (!window.google?.maps?.places) {
+        throw new Error('Google Places API not available after loading');
+    }
 
-        if (!window.google?.maps?.places) {
-            throw new Error('Google Places API not available after loading');
-        }
-
-        console.log('fetchAddressSuggestions - Google Places API is available, creating AutocompleteService');
-
-        return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
             const service = new google.maps.places.AutocompleteService();
 
             const request: google.maps.places.AutocompletionRequest = {
                 input: query,
-                types: ['address']
+                types: searchTypes ? searchTypes.split('|') as any : ['address']
             };
 
             // Add country restriction if provided
@@ -103,15 +86,9 @@ async function fetchAddressSuggestions(query: string, apiKey: string, countryRes
                 request.componentRestrictions = {
                     country: countries
                 };
-                console.log('fetchAddressSuggestions - Added country restrictions:', countries);
             }
 
-            console.log('fetchAddressSuggestions - Making AutocompleteService request:', request);
-
             service.getPlacePredictions(request, (predictions, status) => {
-                console.log('fetchAddressSuggestions - AutocompleteService response status:', status);
-                console.log('fetchAddressSuggestions - AutocompleteService predictions count:', predictions?.length || 0);
-
                 if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
                     const response: GooglePlacesAutocompleteResponse = {
                         predictions: predictions.map(prediction => ({
@@ -139,34 +116,22 @@ async function fetchAddressSuggestions(query: string, apiKey: string, countryRes
                         status: status
                     };
 
-                    console.log('fetchAddressSuggestions - Successfully mapped response with', response.predictions.length, 'predictions');
                     resolve(response);
                 } else {
                     const errorMsg = `Google Places API error: ${status}`;
-                    console.error('fetchAddressSuggestions - Error:', errorMsg);
                     reject(new Error(errorMsg));
                 }
             });
         });
-    } catch (error) {
-        console.error('fetchAddressSuggestions - Catch block error:', error);
-        throw error;
-    }
 }
 
 async function fetchPlaceDetails(placeId: string, apiKey: string): Promise<PlaceDetailsResponse> {
-    console.log('fetchPlaceDetails - Starting with placeId:', placeId);
-    console.log('fetchPlaceDetails - API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'NOT PROVIDED');
-
-    try {
-        // Ensure Google Places API is loaded (following CloseQuote.js pattern)
-        await loadGooglePlacesAPI(apiKey);
+    // Ensure Google Places API is loaded (following CloseQuote.js pattern)
+    await loadGooglePlacesAPI(apiKey);
 
         if (!window.google?.maps?.places) {
             throw new Error('Google Places API not available after loading');
         }
-
-        console.log('fetchPlaceDetails - Google Places API is available, using legacy PlacesService API');
 
         return new Promise((resolve, reject) => {
             // Create a temporary div for the PlacesService (required by Google API)
@@ -191,10 +156,7 @@ async function fetchPlaceDetails(placeId: string, apiKey: string): Promise<Place
                 ]
             };
 
-            console.log('fetchPlaceDetails - Making PlacesService request:', request);
-
             service.getDetails(request, (place, status) => {
-                console.log('fetchPlaceDetails - PlacesService response status:', status);
 
                 if (status === google.maps.places.PlacesServiceStatus.OK && place) {
                     const response: PlaceDetailsResponse = {
@@ -231,19 +193,13 @@ async function fetchPlaceDetails(placeId: string, apiKey: string): Promise<Place
                         status: status
                     };
 
-                    console.log('fetchPlaceDetails - Successfully mapped response');
                     resolve(response);
                 } else {
                     const errorMsg = `Google Places API error: ${status}`;
-                    console.error('fetchPlaceDetails - Error:', errorMsg);
                     reject(new Error(errorMsg));
                 }
             });
         });
-    } catch (error) {
-        console.error('fetchPlaceDetails - Catch block error:', error);
-        throw error;
-    }
 }
 
 export { fetchAddressSuggestions, fetchPlaceDetails };

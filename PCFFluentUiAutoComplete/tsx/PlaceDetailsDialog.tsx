@@ -4,15 +4,52 @@ import { Stack, IStackTokens } from '@fluentui/react/lib/Stack';
 import { Text } from '@fluentui/react/lib/Text';
 import { Icon } from '@fluentui/react/lib/Icon';
 import { Dialog, DialogType, DialogFooter } from '@fluentui/react/lib/Dialog';
-import { PrimaryButton, DefaultButton } from '@fluentui/react/lib/Button';
+import { PrimaryButton, DefaultButton, IconButton } from '@fluentui/react/lib/Button';
 import { Pivot, PivotItem } from '@fluentui/react/lib/Pivot';
+import { getTheme, mergeStyleSets } from '@fluentui/react/lib/Styling';
 
 /// <reference types="google.maps" />
+
+const theme = getTheme();
+const { palette, fonts } = theme;
 
 // Dialog dimensions
 const DIALOG_MAP_HEIGHT = 500; // Larger map for dialog
 const DIALOG_MAP_WIDTH = 800; // Width for dialog map
 const STREETVIEW_HEIGHT = 400; // Height for Street View
+
+// Shared header styles (consistent with SettingsCallout)
+const headerStyles = mergeStyleSets({
+    header: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottom: `1px solid ${palette.neutralQuaternaryAlt}`,
+        padding: '16px 20px',
+        backgroundColor: palette.neutralLighterAlt,
+        borderRadius: '16px 16px 0 0',
+        margin: '0', // Remove any default margins
+        position: 'relative' as const,
+        top: '0',
+        left: '0',
+        right: '0'
+    },
+    title: {
+        fontSize: fonts.medium.fontSize,
+        fontWeight: '600',
+        color: palette.neutralPrimary,
+        margin: 0,
+    },
+    closeButton: {
+        color: palette.neutralSecondary,
+        selectors: {
+            '&:hover': {
+                backgroundColor: palette.neutralQuaternary,
+                color: palette.neutralPrimary,
+            }
+        }
+    }
+});
 
 interface IPlaceDetailsDialogProps {
     placeDetails: PlaceResult;
@@ -192,8 +229,9 @@ export const PlaceDetailsDialog: React.FC<IPlaceDetailsDialogProps> = ({
 
     const dialogContentProps = {
         type: DialogType.normal,
-        title: placeDetails.name || 'Place Details',
-        subText: GooglePlacesUtils.getFormattedAddress(placeDetails)
+        title: GooglePlacesUtils.getFormattedAddress(placeDetails), // Completely remove default title
+        subText: undefined, // Completely remove default subtext
+        showCloseButton: true // Disable default close button since we have our own
     };
 
     const modalProps = React.useMemo(() => ({
@@ -207,8 +245,17 @@ export const PlaceDetailsDialog: React.FC<IPlaceDetailsDialogProps> = ({
             onDismiss={handleDismiss}
             dialogContentProps={dialogContentProps}
             modalProps={modalProps}
-        >
-            <div style={{ height: '600px', overflow: 'auto', padding: '0 4px' }}>
+            styles={{
+                main: {
+                    borderRadius: '16px',
+                    padding: '0', // Remove default padding so we can control it with our header
+                    margin: '0'
+                }
+
+            }}>
+
+
+            <div style={{ height: '600px', overflow: 'auto', padding: '16px' }}>
                 <Pivot
                     selectedKey={selectedTab}
                     onLinkClick={handleTabChange}
@@ -374,7 +421,6 @@ export const PlaceDetailsDialog: React.FC<IPlaceDetailsDialogProps> = ({
 
             <DialogFooter>
                 <PrimaryButton onClick={handleSelect} text="Select" iconProps={{ iconName: 'CheckMark' }} />
-                <DefaultButton onClick={handleDismiss} text="Close" />
                 {placeDetails.url && (
                     <DefaultButton
                         onClick={() => window.open(placeDetails.url, '_blank')}

@@ -3,14 +3,14 @@ import { useDebounce } from 'usehooks-ts'
 import { IInputs } from '../generated/ManifestTypes'
 import { PlacePrediction, AddressItem, GooglePlacesUtils, ParsedAddress, PlaceResult } from '../types'
 import { fetchAddressSuggestions, fetchPlaceDetails } from './Queries'
-import { HoverCard } from './HoverCard'
+import { SettingsCallout } from './SettingsCallout'
+import { PlaceDetailsCallout } from './PlaceDetailsCallout'
 import { useState, useRef, useEffect, ChangeEvent } from 'react'
 import { FocusZone, FocusZoneDirection } from '@fluentui/react/lib/FocusZone'
 import { ITooltipHostStyles, } from '@fluentui/react/lib/Tooltip'
-import { Callout, DirectionalHint } from '@fluentui/react/lib/Callout'
 import { IIconProps } from '@fluentui/react/lib/Icon'
 import { mergeStyleSets, getTheme, getFocusStyle, ITheme } from '@fluentui/react/lib/Styling'
-import { ActionButton } from '@fluentui/react/lib/Button'
+import { ActionButton, IconButton } from '@fluentui/react/lib/Button'
 import { ThemeProvider } from '@fluentui/react/lib/Theme'
 import { SearchBox } from '@fluentui/react/lib/SearchBox'
 import { Stack, IStackTokens } from '@fluentui/react/lib/Stack'
@@ -47,6 +47,20 @@ const dropBtnOne: IIconProps = {
 
 const dropBtnTwo: IIconProps = {
     iconName: 'LocationDot',
+    styles: {
+        root: { color: '#656565' }
+    }
+};
+
+const settingsIcon: IIconProps = {
+    iconName: 'Settings',
+    styles: {
+        root: { color: '#656565' }
+    }
+};
+
+const infoIcon: IIconProps = {
+    iconName: 'Info',
     styles: {
         root: { color: '#656565' }
     }
@@ -166,6 +180,7 @@ const style = mergeStyleSets({
         borderRadius: '4px',
         padding: '4px',
         transform: 'scaleX(1)',
+        flex: 1, // Take up available space
         selectors: {
             '&::after': {
                 border: 'none',
@@ -178,6 +193,34 @@ const style = mergeStyleSets({
             },
         },
     },
+    searchBoxContainer: {
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px', // Add gap between SearchBox and settings button
+    },
+    settingsButton: {
+        backgroundColor: 'transparent',
+        border: `1px solid ${semanticColors.bodyDivider}`,
+        padding: '4px',
+        height: '32px', // Match SearchBox height
+        width: '32px',
+        minWidth: '32px',
+        borderRadius: '4px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0, // Prevent shrinking
+        selectors: {
+            '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                borderColor: palette.neutralSecondary,
+            },
+            '&:active': {
+                backgroundColor: 'rgba(0, 0, 0, 0.1)',
+            }
+        }
+    },
     focusZoneWebIcon: {
         display: 'block',
         cursor: 'pointer',
@@ -188,9 +231,9 @@ const style = mergeStyleSets({
         margin: '8px'
     },
     callout: {
-        width: 480,
-        maxWidth: '95%',
-        padding: '20px 24px',
+        backgroundColor: palette.neutralTertiary,
+        borderRadius: '16px',
+        padding: '0px',
     },
     title: {
         marginBottom: 12,
@@ -272,6 +315,7 @@ export interface FluentUIAutoCompleteProps {
     countryRestriction?: string;
     stateReturnShortName?: boolean;
     countryReturnShortName?: boolean;
+    initialAddress?: ParsedAddress;
     updateValue: (parsedAddress: ParsedAddress) => void;
 }
 
@@ -294,13 +338,20 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
     const [hasUserInteracted, setHasUserInteracted] = useState<boolean>(false);
     const [countryRestrictionEnabled, setCountryRestrictionEnabled] = useState<boolean>(Boolean(props.countryRestriction && props.countryRestriction.trim()));
     const [calloutTarget, setCalloutTarget] = useState<HTMLElement | null>(null);
-    
+    const [isSettingsCalloutVisible, setIsSettingsCalloutVisible] = useState<boolean>(false);
+    const [settingsButtonTarget, setSettingsButtonTarget] = useState<HTMLElement | null>(null);
+    const [searchTypes, setSearchTypes] = useState<string[]>([]);
+    const [isInitialAddressHovered, setIsInitialAddressHovered] = useState<boolean>(false);
+    const [initialAddressButtonTarget, setInitialAddressButtonTarget] = useState<HTMLElement | null>(null);
+    const [initialAddressItem, setInitialAddressItem] = useState<AddressItem | null>(null);
+
     // Use refs for loading and selection state like the working example
     const isLoading = useRef<boolean>(false);
     const isSelected = useRef<boolean>(Boolean(props.value && props.value.trim()));
     const searchboxRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const hoverTimeoutRef = useRef<number | null>(null);
+    const initialAddressHoverTimeoutRef = useRef<number | null>(null);
     const debouncedValue = useDebounce<string>(value, DEBOUNCE_DELAY);
 
     const handleSearch = (evt: ChangeEvent<HTMLInputElement> | undefined) => {
@@ -315,6 +366,36 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
             }
         }
     };
+
+    const isInitialAddress = () => {
+        if (props.initialAddress && props.initialAddress.googlePlaceId) {
+            return props.initialAddress.googlePlaceId.trim() !== '';
+        }
+
+        if (props.initialAddress && props.initialAddress.street && props.initialAddress.city && props.initialAddress.country) {
+            return props.initialAddress.street.trim() !== '' &&
+                props.initialAddress.city.trim() !== '' &&
+                props.initialAddress.country.trim() !== '';
+        }
+
+        return false;
+    };
+
+    // Create initial address item for hover card
+    React.useEffect(() => {
+        if (isInitialAddress() && props.initialAddress) {
+            const addressItem: AddressItem = {
+                placeId: props.initialAddress.googlePlaceId || '',
+                description: props.initialAddress.fullAddress || `${props.initialAddress.street}, ${props.initialAddress.city}, ${props.initialAddress.country}`,
+                mainText: props.initialAddress.street || props.initialAddress.city || '',
+                secondaryText: `${props.initialAddress.city || ''}, ${props.initialAddress.state || ''} ${props.initialAddress.country || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, ''),
+                types: []
+            };
+            setInitialAddressItem(addressItem);
+        } else {
+            setInitialAddressItem(null);
+        }
+    }, [props.initialAddress]);
 
     useEffect(() => {
         async function fetchSuggestions() {
@@ -370,14 +451,17 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                 setHoveredItem(null);
                 setHoveredItemIndex(-1);
                 setCalloutTarget(null); // Close callout
+                setIsSettingsCalloutVisible(false); // Close settings callout
+                setSettingsButtonTarget(null);
+                setIsInitialAddressHovered(false); // Close initial address hover
+                setInitialAddressButtonTarget(null);
                 if (hoverTimeoutRef.current) {
                     clearTimeout(hoverTimeoutRef.current);
                 }
+                if (initialAddressHoverTimeoutRef.current) {
+                    clearTimeout(initialAddressHoverTimeoutRef.current);
+                }
             }
-        };
-
-        const handleScroll = () => {
-            // Position will be recalculated automatically with relative positioning
         };
 
         const handleResize = () => {
@@ -385,12 +469,10 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
         };
 
         document.addEventListener('mousedown', handleClickOutside);
-        window.addEventListener('scroll', handleScroll, true);
         window.addEventListener('resize', handleResize);
-        
+
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
-            window.removeEventListener('scroll', handleScroll, true);
             window.removeEventListener('resize', handleResize);
         };
     }, []);
@@ -491,7 +573,7 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
 
             // Set the input value to the street address only
             setValue(parsedAddress.street || '');
-            
+
             // Update the value through the callback
             props.updateValue(parsedAddress);
 
@@ -539,9 +621,48 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
         }, 200); // Increased delay to 200ms
     };
 
-    const openMapsUrl = (item: AddressItem) => {
-        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.description)}`;
-        window.open(mapsUrl, '_blank');
+    const handleSettingsClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setSettingsButtonTarget(event.currentTarget);
+        setIsSettingsCalloutVisible(!isSettingsCalloutVisible);
+    };
+
+    const handleSettingsCalloutDismiss = () => {
+        setIsSettingsCalloutVisible(false);
+        setSettingsButtonTarget(null);
+    };
+
+    const handleSearchTypesChange = (types: string[]) => {
+        setSearchTypes(types);
+        // Trigger a new search if user has interacted and there's a value
+        if (hasUserInteracted && value.length > MIN_SEARCH_LENGTH) {
+            setSuggestions([]);
+            isLoading.current = true;
+        }
+    };
+
+    const handleInitialAddressHover = (event: React.MouseEvent<HTMLButtonElement>) => {
+        // Clear any existing hide timeout
+        if (initialAddressHoverTimeoutRef.current) {
+            clearTimeout(initialAddressHoverTimeoutRef.current);
+            initialAddressHoverTimeoutRef.current = null;
+        }
+        setInitialAddressButtonTarget(event.currentTarget);
+        setIsInitialAddressHovered(true);
+    };
+
+    const handleInitialAddressLeave = () => {
+        // Clear any existing timeout
+        if (initialAddressHoverTimeoutRef.current) {
+            clearTimeout(initialAddressHoverTimeoutRef.current);
+        }
+
+        // Set a timeout to hide the card, but allow time for mouse to move to hover card
+        initialAddressHoverTimeoutRef.current = window.setTimeout(() => {
+            setIsInitialAddressHovered(false);
+            setInitialAddressButtonTarget(null);
+        }, 200);
     };
 
     const renderDropdown = (item: AddressItem, index: number): React.ReactElement => {
@@ -563,137 +684,138 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
         );
     };
 
-    const getDetail = (address: string) => {
-        // This function appears to be unused, but keeping for backwards compatibility
-        const basicAddress: ParsedAddress = {
-            fullAddress: address,
-            street: '',
-            suburb: '',
-            city: '',
-            state: '',
-            country: '',
-            latitude: undefined,
-            longitude: undefined,
-            building: '',
-            postcode: ''
-        };
-        props.updateValue(basicAddress);
-    };
-
     return (
-        <div ref={containerRef}>
-            <div ref={searchboxRef}>
-                <ThemeProvider theme={theme}>
+        <ThemeProvider theme={theme}>
+            <div ref={containerRef}>
+                <div ref={searchboxRef}>
+
                     <Stack className={style.stackContainer} tokens={stackTokens}>
-                        <SearchBox
-                            className={style.searchBox}
-                            placeholder="Search for an address..."
-                            value={value}
-                            onChange={handleSearch}
-                            onClear={onClear}
-                            iconProps={searchIcon}
-                            disabled={props.isDisabled}
-                        />
-                    </Stack>
-                </ThemeProvider>
-            </div>
-
-            {/* FocusZone Section/Dropdown */}
-            {suggestions.length > 0 && (
-                <FocusZone
-                    direction={FocusZoneDirection.vertical}
-                    className={style.focusZoneContainer}
-                    style={{ width: focusWidth }}
-                >
-                    <div className={style.focusZoneContent}>
-                        {suggestions.map((item, index) => renderDropdown(item, index))}
-                    </div>
-
-                    <div className={style.focusZoneFooter}>
-                        <div className={style.focusZoneFooterLeft}>
-                            <Label style={{ fontSize: '12px', margin: 0, color: '#666', fontWeight: 'normal' }}>
-                                Powered by Google™
-                            </Label>
-                        </div>
-                        <div className={style.focusZoneFooterRight}>
-                            {props.countryRestriction && props.countryRestriction.trim() ? (
-                                <Stack horizontal tokens={{ childrenGap: 8 }} verticalAlign="center">
-                                    <Label style={{ fontSize: '12px', margin: 0, color: '#666' }}>
-                                        Search Restriction:
-                                    </Label>
-                                    <Toggle
-                                        checked={countryRestrictionEnabled}
-                                        onChange={(event, checked) => {
-                                            setCountryRestrictionEnabled(!!checked);
-                                            // Clear current suggestions to force a new search with updated restriction
-                                            if (hasUserInteracted && value.length > MIN_SEARCH_LENGTH) {
-                                                setSuggestions([]);
-                                                isLoading.current = true;
-                                            }
-                                        }}
-                                        inlineLabel
-                                        onText={`${props.countryRestriction.toUpperCase()}`}
-                                        offText="Worldwide"
-                                        styles={{
-                                            root: { marginBottom: 0 },
-                                            label: { fontSize: '12px' },
-                                            text: { fontSize: '12px' }
-                                        }}
-                                    />
-                                </Stack>
-                            ) : (
-                                <ActionButton className={style.focusZoneBtn} iconProps={dropBtnTwo}>
-                                    Worldwide Search
-                                </ActionButton>
+                        <div className={style.searchBoxContainer}>
+                            <SearchBox
+                                className={style.searchBox}
+                                placeholder="Search for an address..."
+                                value={value}
+                                onChange={handleSearch}
+                                onClear={onClear}
+                                iconProps={searchIcon}
+                                disabled={props.isDisabled}
+                            />
+                            {isInitialAddress() && initialAddressItem && (
+                                <IconButton
+                                    className={style.settingsButton}
+                                    iconProps={infoIcon}
+                                    onMouseEnter={handleInitialAddressHover}
+                                    onMouseLeave={handleInitialAddressLeave}
+                                    title="Current Address Info"
+                                    ariaLabel="Show current address information"
+                                />
                             )}
+                            <IconButton
+                                className={style.settingsButton}
+                                iconProps={settingsIcon}
+                                onClick={handleSettingsClick}
+                                title="Search Settings"
+                                ariaLabel="Open search settings"
+                            />
                         </div>
-                    </div>
-                </FocusZone>
-            )}
+                    </Stack>
 
-            {/* Loading indicator */}
-            {isLoading.current && suggestions.length === 0 && hasUserInteracted && debouncedValue.length > MIN_SEARCH_LENGTH && (
-                <FocusZone
-                    direction={FocusZoneDirection.vertical}
-                    className={style.focusZoneContainer}
-                    style={{ width: focusWidth }}
-                >
-                    <div className={style.focusZoneHeader}>
-                        <div className={style.focusZoneHeaderContent}>
-                            <Spinner size={SpinnerSize.small} labelPosition="right" label="Searching..." />
+                </div>
+
+                {/* FocusZone Section/Dropdown */}
+                {suggestions.length > 0 && (
+                    <FocusZone
+                        direction={FocusZoneDirection.vertical}
+                        className={style.focusZoneContainer}
+                        style={{ width: focusWidth }}
+                    >
+                        <div className={style.focusZoneContent}>
+                            {suggestions.map((item, index) => renderDropdown(item, index))}
                         </div>
-                    </div>
-                </FocusZone>
-            )}
 
-            {/* No results found */}
-            {!isLoading.current && suggestions.length === 0 && debouncedValue.length > MIN_SEARCH_LENGTH && hasUserInteracted && (
-                <FocusZone
-                    direction={FocusZoneDirection.vertical}
-                    className={style.focusZoneContainer}
-                    style={{ width: focusWidth }}
-                >
-                    <div className={style.focusZoneHeader}>
-                        <div className={style.focusZoneHeaderContentError}>
-                            No results found
+                        <div className={style.focusZoneFooter}>
+                            <div className={style.focusZoneFooterLeft}>
+                                <Label style={{ fontSize: '12px', margin: 0, color: '#666', fontWeight: 'normal' }}>
+                                    Powered by Google™
+                                </Label>
+                            </div>
+                            <div className={style.focusZoneFooterRight}>
+                                {props.countryRestriction && props.countryRestriction.trim() ? (
+                                    <Stack horizontal tokens={{ childrenGap: 8 }} verticalAlign="center">
+                                        <Label style={{ fontSize: '12px', margin: 0, color: '#666' }}>
+                                            Search Restriction:
+                                        </Label>
+                                        <Toggle
+                                            checked={countryRestrictionEnabled}
+                                            onChange={(event, checked) => {
+                                                setCountryRestrictionEnabled(!!checked);
+                                                // Clear current suggestions to force a new search with updated restriction
+                                                if (hasUserInteracted && value.length > MIN_SEARCH_LENGTH) {
+                                                    setSuggestions([]);
+                                                    isLoading.current = true;
+                                                }
+                                            }}
+                                            inlineLabel
+                                            onText={`${props.countryRestriction.toUpperCase()}`}
+                                            offText="Worldwide"
+                                            styles={{
+                                                root: { marginBottom: 0 },
+                                                label: { fontSize: '12px' },
+                                                text: { fontSize: '12px' }
+                                            }}
+                                        />
+                                    </Stack>
+                                ) : (
+                                    <ActionButton className={style.focusZoneBtn} iconProps={dropBtnTwo}>
+                                        Worldwide Search
+                                    </ActionButton>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                </FocusZone>
-            )}
+                    </FocusZone>
+                )}
 
-            {/* EntityHoverCard using FluentUI Callout */}
-            {hoveredItem && calloutTarget && (
-                <Callout
-                    target={calloutTarget}
+                {/* Loading indicator */}
+                {isLoading.current && suggestions.length === 0 && hasUserInteracted && debouncedValue.length > MIN_SEARCH_LENGTH && (
+                    <FocusZone
+                        direction={FocusZoneDirection.vertical}
+                        className={style.focusZoneContainer}
+                        style={{ width: focusWidth }}
+                    >
+                        <div className={style.focusZoneHeader}>
+                            <div className={style.focusZoneHeaderContent}>
+                                <Spinner size={SpinnerSize.small} labelPosition="right" label="Searching..." />
+                            </div>
+                        </div>
+                    </FocusZone>
+                )}
+
+                {/* No results found */}
+                {!isLoading.current && suggestions.length === 0 && debouncedValue.length > MIN_SEARCH_LENGTH && hasUserInteracted && (
+                    <FocusZone
+                        direction={FocusZoneDirection.vertical}
+                        className={style.focusZoneContainer}
+                        style={{ width: focusWidth }}
+                    >
+                        <div className={style.focusZoneHeader}>
+                            <div className={style.focusZoneHeaderContentError}>
+                                No results found
+                            </div>
+                        </div>
+                    </FocusZone>
+                )}
+
+                {/* EntityHoverCard using PlaceDetailsCallout */}
+                <PlaceDetailsCallout
+                    hoveredItem={hoveredItem}
+                    calloutTarget={calloutTarget}
+                    apiToken={props.apiToken || ''}
                     onDismiss={() => {
                         setHoveredItem(null);
                         setHoveredItemIndex(-1);
                         setCalloutTarget(null);
                     }}
-                    directionalHint={DirectionalHint.rightCenter}
-                    isBeakVisible={true}
-                    gapSpace={10}
-                    calloutMaxHeight={500}
+                    onSelect={handleSelectPlace}
                     onMouseEnter={() => {
                         // Clear any existing timeout when hovering over the callout
                         if (hoverTimeoutRef.current) {
@@ -712,14 +834,51 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                             setCalloutTarget(null);
                         }, 100);
                     }}
-                >
-                    <HoverCard
-                        placeId={hoveredItem.placeId}
-                        apiKey={props.apiToken || ''}
+                />
+
+                {/* Initial Address Hover Card */}
+                {isInitialAddressHovered && initialAddressItem && initialAddressButtonTarget && (
+                    <PlaceDetailsCallout
+                        hoveredItem={initialAddressItem}
+                        calloutTarget={initialAddressButtonTarget}
+                        apiToken={props.apiToken || ''}
+                        onDismiss={() => {
+                            setIsInitialAddressHovered(false);
+                            setInitialAddressButtonTarget(null);
+                        }}
                         onSelect={handleSelectPlace}
+                        onMouseEnter={() => {
+                            // Clear any existing timeout when hovering over the callout
+                            if (initialAddressHoverTimeoutRef.current) {
+                                clearTimeout(initialAddressHoverTimeoutRef.current);
+                                initialAddressHoverTimeoutRef.current = null;
+                            }
+                        }}
+                        onMouseLeave={() => {
+                            // Hide the callout when leaving it
+                            if (initialAddressHoverTimeoutRef.current) {
+                                clearTimeout(initialAddressHoverTimeoutRef.current);
+                            }
+                            initialAddressHoverTimeoutRef.current = window.setTimeout(() => {
+                                setIsInitialAddressHovered(false);
+                                setInitialAddressButtonTarget(null);
+                            }, 100);
+                        }}
                     />
-                </Callout>
-            )}
-        </div>
+                )}
+
+                {/* Settings Callout */}
+                <SettingsCallout
+                    target={settingsButtonTarget}
+                    isVisible={isSettingsCalloutVisible}
+                    onDismiss={handleSettingsCalloutDismiss}
+                    countryRestriction={props.countryRestriction}
+                    countryRestrictionEnabled={countryRestrictionEnabled}
+                    onCountryRestrictionChange={setCountryRestrictionEnabled}
+                    searchTypes={searchTypes}
+                    onSearchTypesChange={handleSearchTypesChange}
+                />
+            </div>
+        </ThemeProvider>
     );
 };

@@ -120,13 +120,13 @@ export class GooglePlacesUtils {
 
     static getAddressComponent(place: PlaceResult, componentType: string): string {
         if (!place.addressComponents) return '';
-        
+
         for (const comp of place.addressComponents) {
             if (comp.types.indexOf(componentType) !== -1) {
                 return comp.longName;
             }
         }
-        
+
         return '';
     }
 
@@ -139,8 +139,8 @@ export class GooglePlacesUtils {
     }
 
     static getCity(place: PlaceResult): string {
-        return this.getAddressComponent(place, 'locality') || 
-               this.getAddressComponent(place, 'administrative_area_level_2');
+        return this.getAddressComponent(place, 'locality') ||
+            this.getAddressComponent(place, 'administrative_area_level_2');
     }
 
     static getState(place: PlaceResult): string {
@@ -164,21 +164,21 @@ export class GooglePlacesUtils {
     }
 
     static getPremise(place: PlaceResult): string {
-        return this.getAddressComponent(place, 'premise') || 
-               this.getAddressComponent(place, 'subpremise');
+        return this.getAddressComponent(place, 'premise') ||
+            this.getAddressComponent(place, 'subpremise');
     }
 
     static getSublocality(place: PlaceResult): string {
         return this.getAddressComponent(place, 'sublocality') ||
-               this.getAddressComponent(place, 'sublocality_level_1') ||
-               this.getAddressComponent(place, 'neighborhood');
+            this.getAddressComponent(place, 'sublocality_level_1') ||
+            this.getAddressComponent(place, 'neighborhood');
     }
 
     static parseAddressComponents(place: PlaceResult, stateReturnShortName: boolean = false, countryReturnShortName: boolean = false): ParsedAddress {
         const streetNumber = this.getStreetNumber(place);
         const streetName = this.getStreetName(place);
         const street = streetNumber && streetName ? `${streetNumber} ${streetName}` : (streetName || streetNumber);
-        
+
         // Handle short name preferences for state and country
         const state = stateReturnShortName ? this.getAddressComponentShortName(place, 'administrative_area_level_1') : this.getState(place);
         const country = countryReturnShortName ? this.getAddressComponentShortName(place, 'country') : this.getCountry(place);
@@ -200,13 +200,13 @@ export class GooglePlacesUtils {
 
     static getAddressComponentShortName(place: PlaceResult, componentType: string): string {
         if (!place.addressComponents) return '';
-        
+
         for (const comp of place.addressComponents) {
             if (comp.types.indexOf(componentType) !== -1) {
                 return comp.shortName;
             }
         }
-        
+
         return '';
     }
 }

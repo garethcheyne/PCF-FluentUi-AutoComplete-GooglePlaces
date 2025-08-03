@@ -1,19 +1,29 @@
 ﻿# PCF Solution Build Configuration
 # This file defines the configuration for building and packaging PCF controls into Power Platform solutions
 
-# Solution Information
+# Solution Information (maps to Solution.xml <SolutionManifest> section)
 solution:
-  name: "PCFFluentUiAutoCompleteGooglePlaces"
-  displayName: "PCF FluentUI Google Address AutoComplete"
+  # Maps to <SolutionManifest><UniqueName>
+  uniqueName: "PCFFluentUiAutoCompleteGooglePlaces"
+  # Maps to <SolutionManifest><LocalizedNames><LocalizedName description="">
+  localizedName: "PCF FluentUI Google Address AutoComplete"
+  # Maps to <SolutionManifest><Descriptions><Description description="">
   description: "A Google Places autocomplete control using React and FluentUI. Provides address search functionality with Google Places API integration."
-  version: "1.0.16"
+  # Maps to <SolutionManifest><Version>
+  version: "2025.08.03.01"
+  # Project GUID - ensures consistent solution identity across rebuilds
+  projectGuid: "5e9de1b4-a755-483b-9a09-7aaf6e2836d1"
 
-# Publisher Information
+# Publisher Information (maps to Solution.xml <Publisher> section)
 publisher:
-  name: "err403"
-  displayName: "err403.com (Gareth Cheyne)"
-  prefix: "err403"
+  # Maps to <Publisher><UniqueName>
+  uniqueName: "err403"
+  # Maps to <Publisher><LocalizedNames><LocalizedName description="">
+  localizedName: "err403.com (Gareth Cheyne)"
+  # Maps to <Publisher><Descriptions><Description description="">  
   description: "err403.com (Gareth Cheyne)"
+  # Maps to <Publisher><CustomizationPrefix>
+  customizationPrefix: "err403"
 
 # Build Configuration
 build:
@@ -29,8 +39,13 @@ build:
   # Whether to run npm ci (clean install) vs npm install
   cleanInstall: true
 
-  # Output directory for build artifacts
-  outputDirectory: "out"
+  # Whether to perform a clean build
+  cleanBuild: true
+
+# Solution Structure Configuration
+solutionStructure:
+  tempDirectory: "solution"
+  outputDirectory: "out/controls"
 
 # Package Configuration
 package:
@@ -41,7 +56,7 @@ package:
   createUnmanaged: true
 
   # Package naming convention
-  namingConvention: "{solution.name}_{version}"
+  namingConvention: "{solution.uniqueName}_{version}"
 # GitHub-specific configuration
 github:
   # Repository information
@@ -64,8 +79,6 @@ github:
 # Environment Variables (can be overridden)
 environment:
   SOLUTION_NAME: "PCFFluentUiAutoCompleteGooglePlaces"
-  PUBLISHER_NAME: "err403.com (Gareth Cheyne)"
-  PUBLISHER_PREFIX: "err403"
   BUILD_CONFIGURATION: "Release"
 
 # Custom Scripts (optional)
@@ -92,3 +105,18 @@ logging:
 
   # Whether to use colors in output
   useColors: true
+
+# Validation Configuration
+validation:
+  requiredFiles:
+    - "PowerPlatformControl.pcfproj"
+    - "PCFFluentUiAutoComplete/ControlManifest.Input.xml"
+    - "package.json"
+  postBuildFiles:
+    - "out/controls/PCFFluentUiAutoComplete/bundle.js"
+  solutionValidation:
+    minPackageSize: 10240
+
+# Project Configuration
+project:
+  pcfRootPath: "../"

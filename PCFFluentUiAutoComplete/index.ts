@@ -3,6 +3,7 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { FluentUIAutoComplete, FluentUIAutoCompleteProps } from './tsx/AutoComplete';
 import { ParsedAddress } from './types';
+import { types } from "util";
 
 /// <reference types="google.maps" />
 
@@ -17,14 +18,15 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 	public _suburb: string | undefined;
 	public _city: string | undefined;
 	public _state: string | undefined;
-	public _country: string | undefined;
 	public _latitude: number | undefined;
 	public _longitude: number | undefined;
 	public _building: string | undefined;
 	public _postcode: string | undefined;
+	public _country: string | undefined;
 	public _googlePlaceId: string | undefined;
 	private _googleMapsScript: HTMLScriptElement | null = null;
 	private _isGoogleMapsLoaded: boolean = false;
+	private _initialAddress: ParsedAddress | undefined;
 
 	constructor() {
 
@@ -43,6 +45,20 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 		this._notifyOutputChanged = notifyOutputChanged;
 		this._container = container;
 		this._context = context;
+
+		this._initialAddress = {
+			fullAddress: '',
+			street: this._context.parameters.street.raw || '',
+			suburb: this._context.parameters.suburb.raw || '',
+			city: this._context.parameters.city.raw || '',
+			state: this._context.parameters.state.raw || '',
+			country: this._context.parameters.country.raw || '',
+			latitude: this._context.parameters.latitude.raw || undefined,
+			longitude: this._context.parameters.longitude.raw || undefined,
+			building: this._context.parameters.building.raw || '',
+			postcode: this._context.parameters.postcode.raw || '',
+			googlePlaceId: this._context.parameters.googlePlaceId.raw || ''
+		};
 
 		// Load Google Maps API if we have an API key
 		if (context.parameters.apiToken.raw) {
@@ -100,11 +116,29 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 	public async updateView(context: ComponentFramework.Context<IInputs>) {
 		// Add code to update control view
 
+		// Update initial address with current context values
+		this._initialAddress = {
+			fullAddress: '',
+			street: context.parameters.street.raw || '',
+			suburb: context.parameters.suburb.raw || '',
+			city: context.parameters.city.raw || '',
+			state: context.parameters.state.raw || '',
+			country: context.parameters.country.raw || '',
+			latitude: context.parameters.latitude.raw || undefined,
+			longitude: context.parameters.longitude.raw || undefined,
+			building: context.parameters.building.raw || '',
+			postcode: context.parameters.postcode.raw || '',
+			googlePlaceId: context.parameters.googlePlaceId.raw || ''
+		};
+
 		this._props.context = context;
 		this._props.apiToken = context.parameters.apiToken.raw || "";
 		this._props.isDisabled = context.mode.isControlDisabled;
 		this._props.countryRestriction = context.parameters.countryRestriction.raw || "";
 		this._props.value = context.parameters.street.raw || "";
+		this._props.stateReturnShortName = context.parameters.stateReturnShortName.raw || false;
+		this._props.countryReturnShortName = context.parameters.countryReturnShortName.raw || false;
+		this._props.initialAddress = this._initialAddress;
 
 		ReactDOM.render(
 			React.createElement(
@@ -135,8 +169,7 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 	}
 
 	private updateValue(parsedAddress: ParsedAddress) {
-
-		if (parsedAddress && parsedAddress.street && parsedAddress.street.trim() !== "") {
+		if (parsedAddress) {
 			this._street = parsedAddress.street || '';
 			this._suburb = parsedAddress.suburb || '';
 			this._city = parsedAddress.city || '';
@@ -147,8 +180,8 @@ export class PCFFluentUiAutoCompleteGooglePlaces implements ComponentFramework.S
 			this._building = parsedAddress.building || '';
 			this._postcode = parsedAddress.postcode || '';
 			this._googlePlaceId = parsedAddress.googlePlaceId || '';
-		}
-		else {
+		} else {
+			// Only clear if explicitly empty
 			this._street = "";
 			this._suburb = "";
 			this._city = "";

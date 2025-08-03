@@ -71,7 +71,7 @@ generated/
 # Solution artifacts
 solution/
 /Solution
-*.zip
+
 
 # Power Platform specific
 .pac/
