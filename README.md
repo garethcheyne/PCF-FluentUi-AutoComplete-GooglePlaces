@@ -326,15 +326,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Discussions**: [GitHub Discussions](https://github.com/garethcheyne/PCF-FluentUi-AutoComplete-GooglePlaces/discussions)
 - **Documentation**: This README and inline code comments
 
-## 🗺️ Roadmap
-
-- [ ] Multi-language support
-- [ ] Custom styling options
-- [ ] Offline mode support
-- [ ] Additional map providers
-- [ ] Enhanced accessibility features
-- [ ] Performance analytics dashboard
-
 ---
 
 **Made with ❤️ for the Power Platform community**

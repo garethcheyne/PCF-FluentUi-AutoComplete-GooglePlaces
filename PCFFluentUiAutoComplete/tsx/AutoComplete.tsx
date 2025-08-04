@@ -55,15 +55,29 @@ const dropBtnTwo: IIconProps = {
 const settingsIcon: IIconProps = {
     iconName: 'Settings',
     styles: {
-        root: { color: '#656565' }
-    }
+        root: {
+            color: '#656565',
+            selectors: {
+                '&:hover': {
+                    color: '#0078d4', // Change icon color to blue on hover
+                }
+            }
+        },
+    },
 };
 
 const infoIcon: IIconProps = {
     iconName: 'Info',
     styles: {
-        root: { color: '#656565' }
-    }
+        root: {
+            color: '#656565',
+            selectors: {
+                '&:hover': {
+                    color: '#0078d4', // Change icon color to blue on hover
+                }
+            }
+        },
+    },
 };
 
 const theme: ITheme = getTheme();
@@ -77,8 +91,8 @@ const style = mergeStyleSets({
         position: 'absolute',
         marginTop: '2px !important',
         border: `1px solid ${semanticColors.bodyDivider}`,
-        boxShadow: '2px 2px 8px rgb(245, 245, 245)',
-        borderRadius: '4px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        borderRadius: '8px',
         flexGrow: 1,
         zIndex: 999999,
         backgroundColor: '#fff'
@@ -89,6 +103,7 @@ const style = mergeStyleSets({
         overflowY: 'scroll',
         msOverflowStyle: 'none',
         scrollbarWidth: 'none',
+        borderRadius: '8px',
         maxHeight: MAX_DROPDOWN_HEIGHT,
         padding: '2px',
         selectors: {
@@ -148,6 +163,7 @@ const style = mergeStyleSets({
         display: 'flex',
         bottom: '0px',
         padding: '8px 10px',
+        borderRadius: '0px 0px 8px 8px',
     },
     focusZoneFooterLeft: {
         width: '50%',
@@ -177,7 +193,7 @@ const style = mergeStyleSets({
     searchBox: {
         backgroundColor: 'rgb(245 ,245, 245)',
         border: 'none',
-        borderRadius: '4px',
+        borderRadius: '4px 0 0 4px', // Round left corners only
         padding: '4px',
         transform: 'scaleX(1)',
         flex: 1, // Take up available space
@@ -197,27 +213,35 @@ const style = mergeStyleSets({
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px', // Add gap between SearchBox and settings button
-    },
-    settingsButton: {
-        backgroundColor: 'transparent',
+        gap: '0', // Remove gap to connect visually
         border: `1px solid ${semanticColors.bodyDivider}`,
+        borderRadius: '4px',
+        backgroundColor: 'rgb(245, 245, 245)', // Match search box background
+    },
+    helperButton: {
+        backgroundColor: 'rgb(230, 230, 230)', // Darker gray background
+        border: 'none',
         padding: '4px',
         height: '32px', // Match SearchBox height
         width: '32px',
         minWidth: '32px',
-        borderRadius: '4px',
+        borderRadius: '0', // No border radius for middle button
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0, // Prevent shrinking
         selectors: {
             '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.05)',
-                borderColor: palette.neutralSecondary,
+                backgroundColor: 'rgb(230, 230, 230)', // Darker background on hover
+                children: {
+                    color: '#0078d4', // Change icon color to blue on hover
+                }
             },
             '&:active': {
-                backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                backgroundColor: '#a0a0a0', // Even darker when pressed
+            },
+            '&:last-child': {
+                borderRadius: '0 4px 4px 0', // Round right corners for last button
             }
         }
     },
@@ -232,7 +256,7 @@ const style = mergeStyleSets({
     },
     callout: {
         backgroundColor: palette.neutralTertiary,
-        borderRadius: '16px',
+        borderRadius: '8px',
         padding: '0px',
     },
     title: {
@@ -368,31 +392,42 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
     };
 
     const isInitialAddress = () => {
-        if (props.initialAddress && props.initialAddress.googlePlaceId) {
-            return props.initialAddress.googlePlaceId.trim() !== '';
-        }
+        try {
+            if (props.initialAddress && props.initialAddress.googlePlaceId) {
+                const hasPlaceId = props.initialAddress.googlePlaceId.trim() !== '';
+                return hasPlaceId;
+            }
 
-        if (props.initialAddress && props.initialAddress.street && props.initialAddress.city && props.initialAddress.country) {
-            return props.initialAddress.street.trim() !== '' &&
-                props.initialAddress.city.trim() !== '' &&
-                props.initialAddress.country.trim() !== '';
-        }
+            if (props.initialAddress && props.initialAddress.street && props.initialAddress.city && props.initialAddress.country) {
+                const hasRequiredFields = props.initialAddress.street.trim() !== '' &&
+                    props.initialAddress.city.trim() !== '' &&
+                    props.initialAddress.country.trim() !== '';
+                return hasRequiredFields;
+            }
 
-        return false;
+            return false;
+        } catch (error) {
+            return false;
+        }
     };
 
     // Create initial address item for hover card
     React.useEffect(() => {
-        if (isInitialAddress() && props.initialAddress) {
-            const addressItem: AddressItem = {
-                placeId: props.initialAddress.googlePlaceId || '',
-                description: props.initialAddress.fullAddress || `${props.initialAddress.street}, ${props.initialAddress.city}, ${props.initialAddress.country}`,
-                mainText: props.initialAddress.street || props.initialAddress.city || '',
-                secondaryText: `${props.initialAddress.city || ''}, ${props.initialAddress.state || ''} ${props.initialAddress.country || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, ''),
-                types: []
-            };
-            setInitialAddressItem(addressItem);
-        } else {
+        try {
+            if (isInitialAddress() && props.initialAddress) {
+                const addressItem: AddressItem = {
+                    placeId: props.initialAddress.googlePlaceId || '',
+                    description: props.initialAddress.fullAddress || `${props.initialAddress.street}, ${props.initialAddress.city}, ${props.initialAddress.country}`,
+                    mainText: props.initialAddress.street || props.initialAddress.city || '',
+                    secondaryText: `${props.initialAddress.city || ''}, ${props.initialAddress.state || ''} ${props.initialAddress.country || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, ''),
+                    types: []
+                };
+
+                setInitialAddressItem(addressItem);
+            } else {
+                setInitialAddressItem(null);
+            }
+        } catch (error) {
             setInitialAddressItem(null);
         }
     }, [props.initialAddress]);
@@ -643,26 +678,35 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
     };
 
     const handleInitialAddressHover = (event: React.MouseEvent<HTMLButtonElement>) => {
-        // Clear any existing hide timeout
-        if (initialAddressHoverTimeoutRef.current) {
-            clearTimeout(initialAddressHoverTimeoutRef.current);
-            initialAddressHoverTimeoutRef.current = null;
+        try {
+            // Clear any existing hide timeout
+            if (initialAddressHoverTimeoutRef.current) {
+                clearTimeout(initialAddressHoverTimeoutRef.current);
+                initialAddressHoverTimeoutRef.current = null;
+            }
+
+            setInitialAddressButtonTarget(event.currentTarget);
+            setIsInitialAddressHovered(true);
+        } catch (error) {
+            // Error handled silently
         }
-        setInitialAddressButtonTarget(event.currentTarget);
-        setIsInitialAddressHovered(true);
     };
 
     const handleInitialAddressLeave = () => {
-        // Clear any existing timeout
-        if (initialAddressHoverTimeoutRef.current) {
-            clearTimeout(initialAddressHoverTimeoutRef.current);
-        }
+        try {
+            // Clear any existing timeout
+            if (initialAddressHoverTimeoutRef.current) {
+                clearTimeout(initialAddressHoverTimeoutRef.current);
+            }
 
-        // Set a timeout to hide the card, but allow time for mouse to move to hover card
-        initialAddressHoverTimeoutRef.current = window.setTimeout(() => {
-            setIsInitialAddressHovered(false);
-            setInitialAddressButtonTarget(null);
-        }, 200);
+            // Set a timeout to hide the card, but allow time for mouse to move to hover card
+            initialAddressHoverTimeoutRef.current = window.setTimeout(() => {
+                setIsInitialAddressHovered(false);
+                setInitialAddressButtonTarget(null);
+            }, 200);
+        } catch (error) {
+            // Error handled silently
+        }
     };
 
     const renderDropdown = (item: AddressItem, index: number): React.ReactElement => {
@@ -702,7 +746,7 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                             />
                             {isInitialAddress() && initialAddressItem && (
                                 <IconButton
-                                    className={style.settingsButton}
+                                    className={style.helperButton}
                                     iconProps={infoIcon}
                                     onMouseEnter={handleInitialAddressHover}
                                     onMouseLeave={handleInitialAddressLeave}
@@ -711,7 +755,7 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                                 />
                             )}
                             <IconButton
-                                className={style.settingsButton}
+                                className={style.helperButton}
                                 iconProps={settingsIcon}
                                 onClick={handleSettingsClick}
                                 title="Search Settings"
@@ -842,6 +886,15 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                         hoveredItem={initialAddressItem}
                         calloutTarget={initialAddressButtonTarget}
                         apiToken={props.apiToken || ''}
+                        initialAddressData={props.initialAddress ? {
+                            street: props.initialAddress.street,
+                            city: props.initialAddress.city,
+                            state: props.initialAddress.state,
+                            country: props.initialAddress.country,
+                            fullAddress: props.initialAddress.fullAddress,
+                            latitude: props.initialAddress.latitude,
+                            longitude: props.initialAddress.longitude
+                        } : undefined}
                         onDismiss={() => {
                             setIsInitialAddressHovered(false);
                             setInitialAddressButtonTarget(null);

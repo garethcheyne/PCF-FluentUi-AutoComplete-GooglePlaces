@@ -1,6 +1,6 @@
 {
     "name":  "pcf-fluentui-google-address-autocomplete",
-    "version":  "1.0.21",
+    "version":  "1.0.36",
     "description":  "PCF control for Google Address Autocomplete using React and FluentUI.",
     "scripts":  {
                     "build":  "pcf-scripts build",

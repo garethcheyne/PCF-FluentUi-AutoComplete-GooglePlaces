@@ -27,7 +27,7 @@ const headerStyles = mergeStyleSets({
         borderBottom: `1px solid ${palette.neutralQuaternaryAlt}`,
         padding: '16px 20px',
         backgroundColor: palette.neutralLighterAlt,
-        borderRadius: '16px 16px 0 0',
+        borderRadius: '8px 8px 0 0',
         margin: '0', // Remove any default margins
         position: 'relative' as const,
         top: '0',
@@ -247,7 +247,7 @@ export const PlaceDetailsDialog: React.FC<IPlaceDetailsDialogProps> = ({
             modalProps={modalProps}
             styles={{
                 main: {
-                    borderRadius: '16px',
+                    borderRadius: '8px',
                     padding: '0', // Remove default padding so we can control it with our header
                     margin: '0'
                 }

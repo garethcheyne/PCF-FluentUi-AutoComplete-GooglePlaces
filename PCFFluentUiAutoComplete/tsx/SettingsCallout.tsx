@@ -19,7 +19,7 @@ const stackTokens: IStackTokens = {
 const styles = mergeStyleSets({
     callout: {
         backgroundColor: palette.white,
-        borderRadius: '16px',
+        borderRadius: '8px',
         border: `1px solid ${palette.neutralQuaternaryAlt}`,
         boxShadow: theme.effects.elevation8,
         minWidth: 280,
@@ -32,7 +32,7 @@ const styles = mergeStyleSets({
         borderBottom: `1px solid ${palette.neutralQuaternaryAlt}`,
         padding: '12px 16px',
         backgroundColor: palette.neutralLighterAlt,
-        borderRadius: '16px 16px 0 0',
+        borderRadius: '8px 8px 0 0',
     },
     title: {
         fontSize: fonts.medium.fontSize,
@@ -113,7 +113,7 @@ export const SettingsCallout: React.FC<SettingsCalloutProps> = ({
             styles={{
                 calloutMain: {
                     backgroundColor: palette.white,
-                    borderRadius: '16px',
+                    borderRadius: '8px',
                     border: `1px solid ${palette.neutralQuaternaryAlt}`,
                     boxShadow: theme.effects.elevation8,
                     minWidth: 280,
@@ -121,10 +121,10 @@ export const SettingsCallout: React.FC<SettingsCalloutProps> = ({
                 },
                 root: {
                     zIndex: 1000000,
-                    borderRadius: '16px'
+                    borderRadius: '8px'
                 },
                 beakCurtain: {
-                    borderRadius: '16px'
+                    borderRadius: '8px'
                 },
                 beak: {
                     backgroundColor: palette.white,

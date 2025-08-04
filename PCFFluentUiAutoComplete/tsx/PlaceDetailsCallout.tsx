@@ -10,7 +10,7 @@ const { palette } = theme;
 const styles = mergeStyleSets({
     callout: {
         backgroundColor: palette.neutralTertiary,
-        borderRadius: '16px',
+        borderRadius: '8px',
         padding: '0px',
     }
 });
@@ -23,6 +23,16 @@ interface PlaceDetailsCalloutProps {
     onSelect: (placeDetails: PlaceResult) => void;
     onMouseEnter?: () => void;
     onMouseLeave?: () => void;
+    // Additional lookup data for when placeId is not available
+    initialAddressData?: {
+        street?: string;
+        city?: string;
+        state?: string;
+        country?: string;
+        fullAddress?: string;
+        latitude?: number;
+        longitude?: number;
+    };
 }
 
 export const PlaceDetailsCallout: React.FC<PlaceDetailsCalloutProps> = ({
@@ -32,7 +42,8 @@ export const PlaceDetailsCallout: React.FC<PlaceDetailsCalloutProps> = ({
     onDismiss,
     onSelect,
     onMouseEnter,
-    onMouseLeave
+    onMouseLeave,
+    initialAddressData
 }) => {
     if (!hoveredItem || !calloutTarget) {
         return null;
@@ -42,17 +53,17 @@ export const PlaceDetailsCallout: React.FC<PlaceDetailsCalloutProps> = ({
         <Callout
             styles={{
                 calloutMain: {
-                    backgroundColor: palette.white,
-                    borderRadius: '16px',
-                    border: `1px solid ${palette.neutralQuaternaryAlt}`,
-                    boxShadow: theme.effects.elevation8
+                    backgroundColor: 'transparent', // Let HoverCard handle background
+                    borderRadius: '8px',
+                    border: 'none', // Remove border - let HoverCard handle it
+                    boxShadow: 'none' // Remove shadow - let HoverCard handle it
                 },
                 root: {
                     zIndex: 1000000,
-                    borderRadius: '16px'
+                    borderRadius: '8px'
                 },
                 beakCurtain: {
-                    borderRadius: '16px'
+                    borderRadius: '8px'
                 },
                 beak: {
                     backgroundColor: palette.white,
@@ -72,6 +83,17 @@ export const PlaceDetailsCallout: React.FC<PlaceDetailsCalloutProps> = ({
             <HoverCard
                 placeId={hoveredItem.placeId}
                 apiKey={apiToken}
+                addressComponents={initialAddressData ? {
+                    street: initialAddressData.street,
+                    city: initialAddressData.city,
+                    state: initialAddressData.state,
+                    country: initialAddressData.country,
+                    fullAddress: initialAddressData.fullAddress
+                } : undefined}
+                coordinates={initialAddressData && initialAddressData.latitude && initialAddressData.longitude ? {
+                    latitude: initialAddressData.latitude,
+                    longitude: initialAddressData.longitude
+                } : undefined}
                 onSelect={onSelect}
                 onClose={onDismiss}
             />

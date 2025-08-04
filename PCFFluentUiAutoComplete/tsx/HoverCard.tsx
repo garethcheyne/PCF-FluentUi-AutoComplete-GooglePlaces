@@ -29,7 +29,7 @@ const headerStyles = mergeStyleSets({
         borderBottom: `1px solid ${palette.neutralQuaternaryAlt}`,
         padding: '12px 16px',
         backgroundColor: palette.neutralLighterAlt,
-        borderRadius: '16px 16px 0 0',
+        borderRadius: '8px 8px 0 0',
         width: '100%',
         boxSizing: 'border-box',
         minWidth: '100%'
@@ -56,15 +56,15 @@ const headerStyles = mergeStyleSets({
         minWidth: `${CARD_WIDTH}px`,
         maxWidth: `${CARD_WIDTH + 20}px`,
         backgroundColor: '#ffffff',
-        borderRadius: '16px',
+        borderRadius: '8px',
         position: 'relative',
         zIndex: 3,
         display: 'flex',
         flexDirection: 'column',
         height: 'auto',
         maxHeight: `${TOTAL_HEIGHT}px`,
-        // Remove border since PlaceDetailsCallout already provides it
-        boxShadow: 'none', // Remove shadow since PlaceDetailsCallout handles it
+        borderBottom: `1px solid ${palette.neutralQuaternaryAlt}`, // Only bottom border
+        boxShadow: theme.effects.elevation8, // Add shadow back to HoverCard
     },
     bodyContent: {
         padding: '16px',
@@ -78,8 +78,20 @@ const headerStyles = mergeStyleSets({
 });
 
 interface IHoverCardProps {
-    placeId: string;
+    placeId?: string;
     apiKey: string;
+    // Alternative lookup methods
+    addressComponents?: {
+        street?: string;
+        city?: string;
+        state?: string;
+        country?: string;
+        fullAddress?: string;
+    };
+    coordinates?: {
+        latitude: number;
+        longitude: number;
+    };
     arrowPosition?: number;
     onLoading?: (isLoading: boolean) => void;
     onSelect?: (placeDetails: PlaceResult) => void;
@@ -91,6 +103,8 @@ interface IHoverCardProps {
 export const HoverCard: React.FC<IHoverCardProps> = ({
     placeId,
     apiKey,
+    addressComponents,
+    coordinates,
     arrowPosition = 24,
     onLoading,
     onSelect,
@@ -108,31 +122,128 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
 
     React.useEffect(() => {
         const fetchDetails = async () => {
-            if (!placeId || !apiKey) return;
+            console.log('PCF HoverCard: Starting lookup process');
+            console.log('PCF HoverCard: Input parameters - placeId:', placeId, 'addressComponents:', addressComponents, 'coordinates:', coordinates);
+            
+            if (!apiKey) {
+                console.log('PCF HoverCard: No API key provided');
+                setError('API key is required');
+                setIsLoading(false);
+                if (onLoading) onLoading(false);
+                return;
+            }
+
+            // Determine lookup method priority: placeId > reconstructed address > coordinates
+            let lookupMethod = '';
+            let lookupValue: string | null = null;
+
+            if (placeId && placeId.trim() !== '') {
+                lookupMethod = 'placeId';
+                lookupValue = placeId.trim();
+                console.log('PCF HoverCard: Using Place ID lookup:', lookupValue);
+            } else if (addressComponents && (addressComponents.street || addressComponents.city)) {
+                lookupMethod = 'address';
+                // Construct address string for geocoding
+                const addressParts = [
+                    addressComponents.street,
+                    addressComponents.city,
+                    addressComponents.state,
+                    addressComponents.country
+                ].filter(part => part && part.trim() !== '');
+                
+                lookupValue = addressParts.join(', ');
+                console.log('PCF HoverCard: Using reconstructed address lookup:', lookupValue);
+            } else if (coordinates && coordinates.latitude && coordinates.longitude) {
+                lookupMethod = 'coordinates';
+                lookupValue = `${coordinates.latitude},${coordinates.longitude}`;
+                console.log('PCF HoverCard: Using coordinates lookup:', lookupValue);
+            } else {
+                console.log('PCF HoverCard: No valid lookup method available');
+                setError('No place ID, coordinates, or address components provided for lookup');
+                setIsLoading(false);
+                if (onLoading) onLoading(false);
+                return;
+            }
 
             setIsLoading(true);
-            setMapLoaded(false); // Reset map loaded state
+            setMapLoaded(false);
             if (onLoading) onLoading(true);
 
             try {
-                const response = await fetchPlaceDetails(placeId, apiKey);
+                let response;
+                
+                if (lookupMethod === 'placeId') {
+                    console.log('PCF HoverCard: Calling fetchPlaceDetails with Place ID:', lookupValue);
+                    response = await fetchPlaceDetails(lookupValue!, apiKey);
+                    console.log('PCF HoverCard: Place ID lookup response:', response);
+                } else if (lookupMethod === 'coordinates') {
+                    console.log('PCF HoverCard: Creating mock result for coordinates:', lookupValue);
+                    // TODO: Implement reverse geocoding API call
+                    // For now, create a basic place result from coordinates
+                    response = {
+                        status: 'OK',
+                        result: {
+                            placeId: '',
+                            formattedAddress: `Location at ${lookupValue}`,
+                            name: 'Geographic Location',
+                            geometry: {
+                                location: {
+                                    lat: coordinates!.latitude,
+                                    lng: coordinates!.longitude
+                                }
+                            },
+                            addressComponents: [],
+                            types: ['geographic_location']
+                        }
+                    };
+                } else if (lookupMethod === 'address') {
+                    console.log('PCF HoverCard: Processing reconstructed address:', lookupValue);
+                    // Check if we have coordinates available to use with the reconstructed address
+                    const hasValidCoordinates = coordinates && coordinates.latitude !== 0 && coordinates.longitude !== 0;
+                    console.log('PCF HoverCard: Available coordinates:', coordinates, 'Valid:', hasValidCoordinates);
+                    
+                    // TODO: Implement geocoding API call for addresses without coordinates
+                    // For now, create a place result using available coordinates or default to 0,0
+                    response = {
+                        status: 'OK',
+                        result: {
+                            placeId: '',
+                            formattedAddress: lookupValue!,
+                            name: addressComponents!.street || addressComponents!.city || 'Address',
+                            geometry: {
+                                location: {
+                                    lat: hasValidCoordinates ? coordinates!.latitude : 0,
+                                    lng: hasValidCoordinates ? coordinates!.longitude : 0
+                                }
+                            },
+                            addressComponents: [],
+                            types: ['street_address']
+                        }
+                    };
+                    console.log('PCF HoverCard: Address result created with coordinates:', response.result.geometry.location);
+                }
 
-                if (response.status === 'OK') {
+                console.log('PCF HoverCard: Final lookup response:', response);
+                if (response && response.status === 'OK') {
+                    console.log('PCF HoverCard: Lookup successful, setting place details');
                     setPlaceDetails(response.result);
                     setError(null);
                 } else {
-                    setError(`Google Places API Error: ${response.status}`);
+                    console.error('PCF HoverCard: Lookup failed with status:', response?.status || 'Unknown error');
+                    setError(`Lookup failed: ${response?.status || 'Unknown error'}`);
                 }
             } catch (err) {
+                console.error('PCF HoverCard: Error during lookup:', err);
                 setError('Failed to load place details');
             } finally {
+                console.log('PCF HoverCard: Lookup process completed');
                 setIsLoading(false);
                 if (onLoading) onLoading(false);
             }
         };
 
         fetchDetails();
-    }, [placeId, apiKey, onLoading]);
+    }, [placeId, addressComponents, coordinates, apiKey, onLoading]);
 
     // Initialize map when place details are loaded
     React.useEffect(() => {
@@ -162,7 +273,12 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
             const lat = GooglePlacesUtils.getLatitude(placeDetails);
             const lng = GooglePlacesUtils.getLongitude(placeDetails);
 
+            console.log('PCF HoverCard: Map initialization - coordinates:', { lat, lng });
+
             if (lat === 0 && lng === 0) {
+                console.log('PCF HoverCard: Invalid coordinates (0,0) detected - setting map as loaded to show warning');
+                // Invalid coordinates from reconstructed address - set map as "loaded" to show the error message
+                setMapLoaded(true);
                 return;
             }
 
@@ -300,7 +416,7 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                     maxWidth: `${CARD_WIDTH + 20}px`,
                     backgroundColor: '#ffffff',
                     border: '1px solid #e1e1e1',
-                    borderRadius: '16px',
+                    borderRadius: '8px',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                     position: 'relative',
                     zIndex: 3
@@ -359,7 +475,7 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                     maxWidth: `${CARD_WIDTH + 20}px`,
                     backgroundColor: '#ffffff',
                     border: '1px solid #e1e1e1',
-                    borderRadius: '16px',
+                    borderRadius: '8px',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                     position: 'relative',
                     zIndex: 3
@@ -570,6 +686,30 @@ export const HoverCard: React.FC<IHoverCardProps> = ({
                             <Text variant="small" style={{ textAlign: 'center', color: '#666', fontSize: '12px' }}>
                                 <Icon iconName="MapPin" style={{ marginRight: '4px' }} />
                                 {!placeDetails ? 'Loading place details...' : !window.google?.maps ? 'Loading Google Maps...' : 'Initializing map...'}
+                            </Text>
+                        </div>
+                    )}
+                    {/* Legacy address message for invalid coordinates */}
+                    {mapLoaded && placeDetails && GooglePlacesUtils.getLatitude(placeDetails) === 0 && GooglePlacesUtils.getLongitude(placeDetails) === 0 && (
+                        <div
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#f8f8f8',
+                                zIndex: 1,
+                                padding: '16px',
+                                boxSizing: 'border-box'
+                            }}
+                        >
+                            <Text variant="small" style={{ textAlign: 'center', color: '#A80000', fontSize: '12px', lineHeight: '16px' }}>
+                                <Icon iconName="Warning" style={{ marginRight: '4px', color: '#A80000' }} />
+                                Sorry, we can't determine the address location. This may be because it's in a legacy format. Please try adding the address again.
                             </Text>
                         </div>
                     )}

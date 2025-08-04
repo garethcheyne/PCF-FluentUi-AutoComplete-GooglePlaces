@@ -10,7 +10,7 @@ solution:
   # Maps to <SolutionManifest><Descriptions><Description description="">
   description: "A Google Places autocomplete control using React and FluentUI. Provides address search functionality with Google Places API integration."
   # Maps to <SolutionManifest><Version>
-  version: "2025.08.03.01"
+  version: "2025.08.04.10"
   # Project GUID - ensures consistent solution identity across rebuilds
   projectGuid: "5e9de1b4-a755-483b-9a09-7aaf6e2836d1"
 
