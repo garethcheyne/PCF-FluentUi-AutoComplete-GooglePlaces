@@ -40,7 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 🔄 Planned
+### � Added
+- **"Accept As Is" Functionality**: When no Google Places results are found, users can now accept their typed input as-is with a dedicated button
+  - Displays as "Accept As Is '[typed_value]'" in the dropdown
+  - Preserves user input when Google Places API doesn't return matches
+  - ⚠️ **Note**: This creates a basic address entry where the typed value becomes the street address, while other address components (city, state, country, coordinates) remain blank
+  - Useful for new developments, rural areas, or custom address formats not in Google's database
+
+### �🔄 Planned
 - Unit test implementation
 - Additional Google Places fields support
 - Custom styling options

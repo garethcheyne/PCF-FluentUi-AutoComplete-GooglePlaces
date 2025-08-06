@@ -622,6 +622,36 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
         }
     }, [props.updateValue, props.stateReturnShortName, props.countryReturnShortName]);
 
+    const handleAcceptAsIs = () => {
+        try {
+            // Create a basic address using the typed value
+            const basicAddress: ParsedAddress = {
+                fullAddress: debouncedValue,
+                street: debouncedValue, // Use the typed value as street
+                suburb: '',
+                city: '',
+                state: '',
+                country: '',
+                latitude: undefined,
+                longitude: undefined,
+                building: '',
+                postcode: '',
+                googlePlaceId: ''
+            };
+
+            // Set the input value and update the parent
+            setValue(debouncedValue);
+            props.updateValue(basicAddress);
+
+            // Reset interaction state and close suggestions
+            setHasUserInteracted(false);
+            setSuggestions([]);
+            isSelected.current = true;
+        } catch (error) {
+            // Error handled silently
+        }
+    };
+
     const onItemHover = (item: AddressItem, index: number) => {
         // Clear any existing hide timeout
         if (hoverTimeoutRef.current) {
@@ -845,6 +875,27 @@ export const FluentUIAutoComplete: React.FC<FluentUIAutoCompleteProps> = (props)
                             <div className={style.focusZoneHeaderContentError}>
                                 No results found
                             </div>
+                        </div>
+                        <div style={{ padding: '8px 12px', borderTop: `1px solid ${palette.neutralTertiary}` }}>
+                            <ActionButton
+                                className={style.focusZoneBtn}
+                                iconProps={{ iconName: 'Accept' }}
+                                onClick={handleAcceptAsIs}
+                                text={`Accept As Is "${debouncedValue}"`}
+                                styles={{
+                                    root: {
+                                        width: '100%',
+                                        justifyContent: 'flex-start',
+                                        backgroundColor: 'transparent',
+                                        border: `1px solid ${palette.neutralSecondary}`,
+                                        borderRadius: '4px'
+                                    },
+                                    rootHovered: {
+                                        backgroundColor: palette.neutralLighter,
+                                        borderColor: palette.neutralPrimary
+                                    }
+                                }}
+                            />
                         </div>
                     </FocusZone>
                 )}
