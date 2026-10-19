@@ -2,12 +2,8 @@
     "extends": "./node_modules/pcf-scripts/tsconfig_base.json",
     "compilerOptions": {
         "typeRoots": ["node_modules/@types"],
-        "lib": ["ES6", "DOM", "ES2015", "ES2017"],
-        "target": "ES2015",
-        "jsx": "react",
-        "module": "commonjs",
-        "moduleResolution": "node",
         "esModuleInterop": true,
-        "allowSyntheticDefaultImports": true
+        "allowSyntheticDefaultImports": true,
+        "skipLibCheck": true
     }
 }

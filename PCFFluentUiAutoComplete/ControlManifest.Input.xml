@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="err403" constructor="PCFFluentUiAutoCompleteGooglePlaces" version="1.0.37" display-name-key="PCF FluentUI Google Address AutoComplete" description-key="A Google Places autocomplete control using React and FluentUI. Provides address search functionality with Google Places API integration." control-type="standard" preview-image="img/preview.png">
+  <control namespace="err403" constructor="PCFFluentUiAutoCompleteGooglePlaces" version="1.1.7" display-name-key="PCF FluentUI Google Address AutoComplete" description-key="A Google Places autocomplete control using React and FluentUI. Provides address search functionality with Google Places API integration." control-type="virtual" preview-image="img/preview.png">
     <property name="apiToken" display-name-key="Google API Key" description-key="Google Places API Key for address autocomplete functionality" of-type="SingleLine.Text" usage="input" required="true" />
     <property name="countryRestriction" display-name-key="Country Restriction" description-key="Restrict search results to specific countries. Leave empty to allow all countries" of-type="SingleLine.Text" usage="input" required="false" />
     <property name="stateReturnShortName" display-name-key="State Return Short Name" description-key="Return state/region as abbreviation instead of full name" of-type="TwoOptions" usage="input" required="false" />
@@ -17,6 +17,8 @@
     <property name="googlePlaceId" display-name-key="Google Place ID" description-key="Google Place ID from selected address for reference" of-type="SingleLine.Text" usage="bound" required="false" />
     <resources>
       <code path="index.ts" order="1" />
+      <platform-library name="React" version="16.14.0" />
+      <platform-library name="Fluent" version="9.46.2" />
       <css path="css/PCFFluentUiAutoComplete.css" order="1" />
       <resx path="strings/PCFFluentUiAutoComplete.1033.resx" version="1.0.0" />
     </resources>
