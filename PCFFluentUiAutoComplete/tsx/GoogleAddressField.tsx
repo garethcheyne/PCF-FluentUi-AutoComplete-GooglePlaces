@@ -83,6 +83,8 @@ const AddressField: React.FC<Omit<GoogleAddressFieldProps, 'theme'>> = ({
             countryShortName={countryShortName}
             readOnly={readOnly}
             allowFreeText
+            // "Level 5/135 Coronation Dr" belongs on the street line the field is bound to
+            unitPlacement="street"
             placeholder="Search for an address..."
             header={header}
         />
